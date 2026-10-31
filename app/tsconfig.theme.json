@@ -1,0 +1,15 @@
+{
+  // theme.ts: a plain script (no modules) that applies the saved theme before the
+  // first paint, so it's compiled on its own into app/ui/theme.js, after Vite's build.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023", "dom"],
+    "strict": true,
+    "noEmitOnError": true,
+    "skipLibCheck": true,
+    "types": [],
+    "rootDir": "src/ui",
+    "outDir": "ui"
+  },
+  "files": ["src/ui/theme.ts", "src/types.d.ts"]
+}

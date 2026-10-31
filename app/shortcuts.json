@@ -1,0 +1,19 @@
+[
+  { "id": "down", "group": "Move", "label": "Move down", "scope": "move", "defaults": ["ArrowDown"] },
+  { "id": "up", "group": "Move", "label": "Move up", "scope": "move", "defaults": ["ArrowUp"] },
+  { "id": "left", "group": "Move", "label": "Move left", "where": "How scoring works and the theme picker", "scope": "move", "defaults": ["ArrowLeft"] },
+  { "id": "right", "group": "Move", "label": "Move right", "where": "How scoring works and the theme picker", "scope": "move", "defaults": ["ArrowRight"] },
+  { "id": "openLink", "group": "Task lists", "label": "Open the task's link", "scope": "list", "defaults": ["Enter"] },
+  { "id": "toggleWhy", "group": "Task lists", "label": "Show or hide Why this ranking", "scope": "list", "defaults": ["r"] },
+  { "id": "openTask", "group": "History", "label": "Open the task", "scope": "history", "defaults": ["Enter"] },
+  { "id": "toggleOlder", "group": "History", "label": "Show or hide a task's older updates", "scope": "history", "defaults": ["Space"] },
+  { "id": "goNext", "group": "Go to", "label": "Do next", "scope": "global", "defaults": ["Meta+1"] },
+  { "id": "goLater", "group": "Go to", "label": "Later", "scope": "global", "defaults": ["Meta+2"] },
+  { "id": "goBlocked", "group": "Go to", "label": "Blocked", "scope": "global", "defaults": ["Meta+3"] },
+  { "id": "goHistory", "group": "Go to", "label": "History", "scope": "global", "defaults": ["Meta+4"] },
+  { "id": "goSettings", "group": "Go to", "label": "Settings", "scope": "global", "defaults": ["Meta+,"] },
+  { "id": "checkNow", "group": "App", "label": "Check now", "scope": "global", "defaults": ["Meta+r"] },
+  { "id": "toggleDetails", "group": "App", "label": "Show or hide details", "scope": "global", "defaults": ["Meta+\\"] },
+  { "id": "prevTheme", "group": "App", "label": "Previous theme", "scope": "global", "defaults": ["Meta+["] },
+  { "id": "nextTheme", "group": "App", "label": "Next theme", "scope": "global", "defaults": ["Meta+]"] }
+]

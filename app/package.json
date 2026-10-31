@@ -1,0 +1,24 @@
+{
+  "name": "work-board",
+  "productName": "Work Board",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Shows the work board and updates it when the hourly job rewrites board.json.",
+  "main": "build/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.main.json && vite build && tsc -p tsconfig.theme.json",
+    "typecheck": "tsc -p tsconfig.main.json --noEmit && tsc -p tsconfig.theme.json --noEmit && svelte-check --tsconfig ./tsconfig.ui.json",
+    "start": "npm run build && electron .",
+    "package": "npm run build && electron-packager . 'Work Board' --platform=darwin --arch=arm64 --out=dist --overwrite --icon=icon/icon.icns --ignore=^/icon --ignore=^/src --ignore='^/tsconfig' --ignore='^/vite\\.config' --app-bundle-id=local.work-board"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "electron": "^45.1.0",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.7",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.5"
+  }
+}

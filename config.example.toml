@@ -1,0 +1,63 @@
+# Work Board settings. Copy to config.toml (gitignored) and fill it in.
+# Your accounts, projects and sources live here; prompt.md and the scripts stay generic.
+# The people you work with and your preferences for the refresh agent (e.g. "Slack is
+# the best source of tasks") go on the app's Preferences page, saved to preferences.md.
+
+[you]
+name = "Ada Lovelace"
+role = "backend engineer at Example Co"
+github_login = "ada"               # gh must be signed in as this user
+slack_user_id = "U0123456789"      # optional; leave out if you don't use Slack
+repos = ["example/api"]            # main repos, in order
+
+# Projects the board groups tasks under, in priority order. The agent never
+# adds, drops or reorders these; edit them here.
+[[projects]]
+key = "api-v2"
+name = "API v2"
+priority = "high"                  # high, medium or low: a task's starting impact
+stage = "ongoing"                  # optional
+done_when = "Done when v2 endpoints are live for all customers."
+color = "#d9a441"
+
+[[projects]]
+key = "team"
+name = "Team and customers"
+priority = "medium"
+done_when = "Ongoing: reviews teammates need from you, and customer calls."
+color = "#9c89b8"
+
+# Sources. Leave a section out to skip that source.
+
+[github]                           # uses the gh CLI
+
+[slack]
+# Any Slack MCP server that offers conversations_history, conversations_replies
+# and conversations_search_messages. ~ is expanded.
+mcp_command = ["slack-mcp-server", "--transport", "stdio"]
+channels = [
+  { id = "C0123456789", name = "#team" },
+  { id = "D0123456789", name = "DM with Alex" },
+  { id = "C0987654321", name = "#acme-shared", customer = true },  # customer = true marks a channel shared with a customer
+]
+
+[t3]                               # T3 Code agent threads
+db = "~/.t3/userdata/statev2.sqlite"
+
+# Optional: an end-of-day standup draft, rewritten on every check and shown on the
+# app's Standup page with a copy button. Your style rules go on the Preferences page.
+# [standup]
+# enabled = true
+# channel = { id = "C0123456789", name = "#standup" }  # optional: where you post it, to match your past posts
+
+[claude]
+model = "claude-opus-5-5"
+effort = "high"
+timeout_minutes = 30
+
+[schedule]                         # local time; the first run of the day writes a "today" note
+first_hour = 8                     # checks run on the hour, from first_hour through last_hour
+last_hour = 22
+weekdays_only = true
+enabled = true                     # false stops the automatic checks; Check now still works
+# The app's Settings page edits this table and reloads the schedule for you.

@@ -1,0 +1,21 @@
+# Your settings and data
+config.toml
+preferences.md
+preferences.md.tmp
+config.toml.tmp
+work.db*
+board.html
+board.json
+reports.md
+logs/
+.lock/
+*.bak-*
+__pycache__/
+
+# App build output
+app/node_modules/
+app/dist/
+app/build/
+app/ui/
+app/location.json
+last_check

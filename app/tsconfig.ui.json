@@ -1,0 +1,17 @@
+{
+  // The window's Svelte app, type-checked by svelte-check (Vite builds it, so no emit here).
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": ["src/ui/**/*.ts", "src/ui/**/*.svelte", "src/types.d.ts"],
+  "exclude": ["src/ui/theme.ts"]
+}

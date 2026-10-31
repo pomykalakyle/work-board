@@ -1,0 +1,15 @@
+{
+  // The Electron main process and preload: Node, CommonJS, compiled to build/.
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noEmitOnError": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "rootDir": "src/main",
+    "outDir": "build"
+  },
+  "files": ["src/main/main.ts", "src/main/preload.ts", "src/types.d.ts"]
+}
