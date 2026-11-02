@@ -55,6 +55,12 @@ model = "claude-opus-5-5"
 effort = "high"
 timeout_minutes = 30
 
+# Optional overrides for automatic fallback when Claude fails. Codex must be signed in.
+[codex]
+model = "gpt-6.1-sol"
+effort = "high"
+timeout_minutes = 30
+
 [schedule]                         # local time; the first run of the day writes a "today" note
 first_hour = 8                     # checks run on the hour, from first_hour through last_hour
 last_hour = 22

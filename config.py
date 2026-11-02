@@ -190,6 +190,24 @@ def mcp(c):
     return json.dumps({"mcpServers": {"slack": {"type": "stdio", "command": cmd[0], "args": cmd[1:]}}})
 
 
+def codex_options(c):
+    """Validate optional fallback settings and supply defaults for existing boards."""
+    options = {"model": "gpt-6.1-sol", "effort": "high",
+               "timeout_minutes": c.get("claude", {}).get("timeout_minutes", 30)}
+    section = c.get("codex", {})
+    if not isinstance(section, dict):
+        raise ValueError("[codex] must be a table.")
+    options.update(section)
+    if not isinstance(options["model"], str) or not options["model"].strip():
+        raise ValueError("[codex] model must be a nonempty string.")
+    if options["effort"] not in ("low", "medium", "high", "xhigh", "max", "ultra"):
+        raise ValueError("[codex] effort must be low, medium, high, xhigh, max or ultra.")
+    timeout = options["timeout_minutes"]
+    if not isinstance(timeout, int) or isinstance(timeout, bool) or timeout <= 0:
+        raise ValueError("[codex] timeout_minutes must be a positive whole number.")
+    return options
+
+
 def tools(c):
     """The agent's allowed tools. run.sh runs it in dontAsk mode, which allows file reads inside the
     board folder and denies anything not listed here, so it can't read the rest of the disk, write
@@ -530,8 +548,12 @@ def check(c):
     t = cl.get("timeout_minutes")
     if not isinstance(t, int) or isinstance(t, bool) or t <= 0:
         problems.append("[claude] timeout_minutes must be a whole number of minutes.")
-    if not which("claude"):
-        problems.append("Claude Code (claude) isn't on the PATH the hourly run uses.")
+    try:
+        codex_options(c)
+    except ValueError as e:
+        problems.append(str(e))
+    if not which("claude") and not which("codex"):
+        problems.append("Install and sign in to Claude Code or Codex on the hourly run PATH.")
     if not any(k in c for k in ("github", "slack", "t3")):
         problems.append("Turn on at least one source: [github], [slack] or [t3].")
     if "github" in c:

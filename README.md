@@ -7,7 +7,9 @@ It runs on macOS with Apple Silicon.
 ## How it works
 
 1. launchd runs `run.sh` once an hour, during the hours you set on the app's Settings page.
-2. `run.sh` starts a headless `claude -p` run with `prompt.md`. The agent reads your sources and writes tasks and their history into `work.db`, a local SQLite file.
+2. `run.sh` starts a headless `claude -p` run with `prompt.md`.
+   If Claude fails, times out, runs out of usage or is unavailable, it retries once with Sol through Codex.
+   The agent reads your sources and writes tasks and their history into `work.db`, a local SQLite file.
 3. `render_board.py` turns `work.db` into `board.json`, and the app picks up the new file. A Mac notification lists what changed.
 
 Each task gets a tier (Must, Should or Later) and a score from its impact, urgency and effort. The rules live in `ranking.md`, and the app's "How scoring works" page shows the same text.
@@ -18,6 +20,7 @@ Each task gets a tier (Must, Should or Later) and a score from its impact, urgen
 - Python 3.11 or newer (`brew install python`). The `python3` that ships with macOS is 3.9, which is too old.
 - Node.js 22.12 or newer, to build the app (`brew install node`)
 - [Claude Code](https://docs.claude.com/en/docs/claude-code/overview), signed in
+- [Codex CLI](https://developers.openai.com/codex/noninteractive), signed in, for automatic fallback
 - For GitHub: the [GitHub CLI](https://cli.github.com/), signed in as you
 - For Slack: a Slack MCP server that offers `conversations_history`, `conversations_replies` and `conversations_search_messages`, such as [korotovsky/slack-mcp-server](https://github.com/korotovsky/slack-mcp-server)
 - For T3 Code threads: T3 Code installed on the same Mac
@@ -75,11 +78,23 @@ If you disagree with a score, ask a coding agent in this folder to pin it, for e
 
 Each run is a full Claude Code session with the model and effort set in `config.toml`. The example config uses Opus at high effort with a 30 minute cap. The default schedule, 8am to 10pm on weekdays, comes to 15 runs a day, so check your Claude plan or API spend before you leave it on. Fewer hours on the Settings page, or a smaller model in `config.toml`, cuts the cost. Turning automatic checks off stops the hourly runs; Check now still works.
 
+The fallback defaults to `gpt-6.1-sol` at high effort and uses the same timeout as Claude.
+Optional `[codex]` settings in `config.toml` override `model`, `effort` and `timeout_minutes`.
+Each refresh tries Claude first, then Codex once; if both fail, the last successful check timestamp stays unchanged and the refresh exits with an error.
+
 ## Your data
 
-The board itself stays on your Mac, though the agent sends what it reads to Claude to process it. Your settings and data are in gitignored files: `config.toml`, `preferences.md`, `work.db`, `board.json`, `board.html`, `reports.md` and `logs/`.
+The board itself stays on your Mac, though the agent sends what it reads to Claude, or OpenAI when fallback is used, to process it.
+Your settings and data are in gitignored files: `config.toml`, `preferences.md`, `work.db`, `board.json`, `board.html`, `reports.md` and `logs/`.
 
-The agent runs with a short list of allowed tools (`tools()` in `config.py`) in Claude Code's `dontAsk` mode, which turns down anything not on the list. It can read files only inside this folder, call three read-only Slack tools, and run read-only `gh` commands. Its one write path is `db.py`, and SQLite itself limits that to adding and updating tasks, adding history entries and writing the standup draft. The prompt also tells it never to post, reply or comment anywhere. Slack messages come from other people, so a message could try to steer the agent. With these limits, that mostly means wrong entries on your board.
+The agent runs with a short list of allowed tools (`tools()` in `config.py`) in Claude Code's `dontAsk` mode, which turns down anything not on the list.
+It can read files only inside this folder, call three read-only Slack tools, and run read-only `gh` commands.
+Its one write path is `db.py`, and SQLite itself limits that to adding and updating tasks, adding history entries and writing the standup draft.
+Codex runs in a read-only sandbox with shell execution disabled and user config excluded.
+A restricted MCP bridge exposes the same read-only source commands and guarded `db.py` writes; Slack exposes only the three read tools.
+The prompt also tells it never to post, reply or comment anywhere.
+Slack messages come from other people, so a message could try to steer the agent.
+With these limits, that mostly means wrong entries on your board.
 
 ## License
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Work board refresh: a headless Claude run updates work.db from the sources in
+# Work board refresh: Claude (or Codex on failure) updates work.db from sources in
 # config.toml, then this script rebuilds board.html and board.json and posts the
 # report as a Mac notification. install.sh schedules it with launchd; safe to
 # run by hand.
@@ -38,36 +38,16 @@ subprocess.run(["osascript", "-e", "on run argv", "-e", "display notification (i
 
 python3 -I config.py init || { notify "Work board" "config.toml has a problem. See logs."; exit 1; }
 prompt="$(NOW="$(date '+%A %Y-%m-%d %H:%M %Z')" python3 -I config.py prompt)"
-model="$(python3 -I config.py get claude.model)"
-effort="$(python3 -I config.py get claude.effort)"
-timeout=$(( $(python3 -I config.py get claude.timeout_minutes) * 60 ))
-tools=()
-while IFS= read -r t; do tools+=("$t"); done < <(python3 -I config.py tools)
-mcp="$(python3 -I config.py mcp)"
-mcp_args=()
-[ -n "$mcp" ] && mcp_args=(--mcp-config "$mcp")
-
-# Read-only tools only, apart from db.py writing work.db (config.py tools lists them; --tools hides
-# Edit, Write, web and other built-in tools entirely). Time-capped.
-report="$(perl -e 'alarm shift; exec @ARGV' "$timeout" claude -p "$prompt" \
-  --model "$model" \
-  --effort "$effort" \
-  --no-session-persistence \
-  --setting-sources project,local \
-  --settings '{"autoMemoryEnabled": false}' \
-  ${mcp_args[@]+"${mcp_args[@]}"} --strict-mcp-config \
-  --permission-mode dontAsk \
-  --tools "Bash,Read,Grep,Glob" \
-  --allowedTools "${tools[@]}" \
-  < /dev/null)"
+# The runner prefers Claude, then retries once with Codex on failure.
+report="$(printf '%s' "$prompt" | python3 -I refresh_agent.py)"
 status=$?
 echo "$report"
 if [ $status -ne 0 ]; then
-  echo "claude run failed (exit $status)"
+  echo "refresh providers failed (exit $status)"
   notify "Work board" "The board check failed (exit $status). See $DIR/logs."
 fi
 
-# Rebuild the page every run, even if the Claude run failed, so the time stamp shows the last good data.
+# Rebuild the page every run, even if the agent run failed, so the time stamp shows the last good data.
 # Every task, done ones included: the app lists a project's done tasks; render_board.py keeps board.html to today's.
 python3 -I db.py export "SELECT task_key, title, status, tier, tier_reason, impact, urgency, effort, impact_reason, urgency_reason, pinned, next_step, blocked_on, link, done_at, project_key, source FROM work_tasks" "$TMP/tasks.json"
 python3 -I db.py export "SELECT project_key, name, priority, stage, done_when, color, rank FROM work_projects WHERE status = 'active' ORDER BY rank" "$TMP/projects.json"
@@ -96,3 +76,5 @@ if [ $status -eq 0 ] && [ -n "$report" ] && [ "$(echo "$report" | tr -d '[:space
   notify "Work board" "$report"
 fi
 echo "=== done $(date '+%H:%M:%S')"
+
+exit "$status"
