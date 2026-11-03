@@ -42,7 +42,7 @@ How much finishing it matters.
 
 ### Context
 
-Start from the project's priority (high 4, medium 3, low 2) and move it up or down for this task.
+Start from the project's priority (high 4, medium 3, low 2; no project 2) and move it up or down for this task.
 
 ## Urgency
 
