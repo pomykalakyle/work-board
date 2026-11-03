@@ -208,6 +208,33 @@ def codex_options(c):
     return options
 
 
+def claude_env(c):
+    """The environment for the Claude run: ours, or with [claude] base_url, ours pointed at that
+    Anthropic-compatible proxy (e.g. CLIProxyAPI, which spreads runs over several accounts).
+    auth_token_command, if set, prints the proxy's API key; it runs on every check, so the key
+    never sits in config.toml. Without one, a placeholder token keeps Claude Code from sending
+    its own sign-in to the proxy. None means use the plain `claude` sign-in."""
+    cl = c.get("claude", {})
+    url = cl.get("base_url")
+    if not url:
+        return None
+    if not isinstance(url, str) or not re.match(r"https?://", url):
+        raise ValueError("[claude] base_url must be an http:// or https:// URL.")
+    cmd = cl.get("auth_token_command")
+    if cmd is None:
+        token = "work-board"
+    elif isinstance(cmd, list) and cmd and all(isinstance(a, str) for a in cmd):
+        r = subprocess.run([os.path.expanduser(a) for a in cmd], capture_output=True, text=True)
+        token = r.stdout.strip()
+        if r.returncode or not token:
+            raise ValueError("[claude] auth_token_command failed or printed nothing.")
+    else:
+        raise ValueError("[claude] auth_token_command must be a list of strings, e.g. [\"secret\", \"get\", \"NAME\"].")
+    env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN")}
+    env.update(ANTHROPIC_BASE_URL=url, ANTHROPIC_AUTH_TOKEN=token)
+    return env
+
+
 def tools(c):
     """The agent's allowed tools. run.sh runs it in dontAsk mode, which allows file reads inside the
     board folder and denies anything not listed here, so it can't read the rest of the disk, write
@@ -548,10 +575,11 @@ def check(c):
     t = cl.get("timeout_minutes")
     if not isinstance(t, int) or isinstance(t, bool) or t <= 0:
         problems.append("[claude] timeout_minutes must be a whole number of minutes.")
-    try:
-        codex_options(c)
-    except ValueError as e:
-        problems.append(str(e))
+    for validate in (codex_options, claude_env):
+        try:
+            validate(c)
+        except ValueError as e:
+            problems.append(str(e))
     if not which("claude") and not which("codex"):
         problems.append("Install and sign in to Claude Code or Codex on the hourly run PATH.")
     if not any(k in c for k in ("github", "slack", "t3")):

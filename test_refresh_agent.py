@@ -49,7 +49,7 @@ class RefreshTests(unittest.TestCase):
     def test_codex_requires_success_and_final_report(self):
         """An empty report or failing provider must never count as a successful refresh."""
         for status, report, expected in [(0, "NO_UPDATE", 0), (0, "", 1), (1, "partial", 1)]:
-            def fake_execute(argv, timeout):
+            def fake_execute(argv, timeout, env=None):
                 """Simulate Codex's final-message artifact and inspect its restrictions."""
                 Path(argv[argv.index("--output-last-message") + 1]).write_text(json.dumps({"completed": True, "report": report}))
                 self.assertIn("--ignore-user-config", argv)
@@ -67,7 +67,7 @@ class RefreshTests(unittest.TestCase):
 
     def test_codex_rejects_incomplete_refresh(self):
         """Reject an explicit incomplete result even when Codex exits successfully."""
-        def fake_execute(argv, timeout):
+        def fake_execute(argv, timeout, env=None):
             """Write a valid but unsuccessful structured result."""
             Path(argv[argv.index("--output-last-message") + 1]).write_text(
                 json.dumps({"completed": False, "report": "Slack was unavailable"}))
@@ -159,6 +159,25 @@ class RefreshTests(unittest.TestCase):
         for section in ({"timeout_minutes": "30"}, {"timeout_minutes": True}, {"model": 6}, {"effort": "bad"}):
             with self.subTest(section=section), self.assertRaises(ValueError):
                 agent.config.codex_options({**C, "codex": section})
+
+    def test_claude_proxy_env(self):
+        """base_url points Claude at a proxy with a token, and never forwards the user's own credentials."""
+        self.assertIsNone(agent.config.claude_env(C))
+        proxy = {"claude": {**C["claude"], "base_url": "http://127.0.0.1:8317"}}
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "real", "CLAUDE_CODE_OAUTH_TOKEN": "real"}):
+            env = agent.config.claude_env(proxy)
+            self.assertEqual((env["ANTHROPIC_BASE_URL"], env["ANTHROPIC_AUTH_TOKEN"]), ("http://127.0.0.1:8317", "work-board"))
+            self.assertNotIn("ANTHROPIC_API_KEY", env)
+            self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", env)
+        keyed = {"claude": {**proxy["claude"], "auth_token_command": [sys.executable, "-c", "print('k1')"]}}
+        self.assertEqual(agent.config.claude_env(keyed)["ANTHROPIC_AUTH_TOKEN"], "k1")
+        for bad in ({"base_url": "127.0.0.1:8317"}, {"auth_token_command": "secret get X"},
+                    {"auth_token_command": [sys.executable, "-c", "pass"]}):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                agent.config.claude_env({"claude": {**proxy["claude"], **bad}})
+        with patch.object(agent, "execute", return_value=(0, json.dumps({"subtype": "success", "result": "ok"}))) as run:
+            agent.claude(proxy, "prompt")
+            self.assertEqual(run.call_args.args[2]["ANTHROPIC_BASE_URL"], "http://127.0.0.1:8317")
 
     def test_timeout(self):
         """A stuck provider is stopped promptly and becomes a fallback-eligible error."""

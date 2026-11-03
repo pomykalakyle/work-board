@@ -15,9 +15,9 @@ DIR = Path(__file__).resolve().parent
 SLACK_TOOLS = ["conversations_history", "conversations_replies", "conversations_search_messages"]
 
 
-def execute(argv, timeout):
-    """Run a provider with a deadline that also stops its MCP subprocesses."""
-    process = subprocess.Popen(argv, cwd=DIR, stdin=subprocess.DEVNULL,
+def execute(argv, timeout, env=None):
+    """Run a provider with a deadline that also stops its MCP subprocesses. env None inherits ours."""
+    process = subprocess.Popen(argv, cwd=DIR, stdin=subprocess.DEVNULL, env=env,
                                stdout=subprocess.PIPE, text=True, start_new_session=True)
     def stop():
         """Stop the whole provider group, including its MCP servers."""
@@ -58,7 +58,7 @@ def claude(c, prompt):
     mcp = config.mcp(c)
     if mcp:
         argv += ["--mcp-config", mcp]
-    status, output = execute(argv, cl["timeout_minutes"] * 60)
+    status, output = execute(argv, cl["timeout_minutes"] * 60, config.claude_env(c))
     if status:
         return status, output
     try:

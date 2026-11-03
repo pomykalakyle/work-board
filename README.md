@@ -82,6 +82,9 @@ The fallback defaults to `gpt-6.1-sol` at high effort and uses the same timeout 
 Optional `[codex]` settings in `config.toml` override `model`, `effort` and `timeout_minutes`.
 Each refresh tries Claude first, then Codex once; if both fail, the last successful check timestamp stays unchanged and the refresh exits with an error.
 
+To spread runs over several Claude accounts, run a proxy such as [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) and set `base_url` under `[claude]` to its address.
+If the proxy checks API keys, set `auth_token_command` to a command that prints the key, so the key stays out of `config.toml`.
+
 ## Your data
 
 The board itself stays on your Mac, though the agent sends what it reads to Claude, or OpenAI when fallback is used, to process it.

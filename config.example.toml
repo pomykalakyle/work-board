@@ -54,6 +54,10 @@ db = "~/.t3/userdata/statev2.sqlite"
 model = "claude-opus-5-5"
 effort = "high"
 timeout_minutes = 30
+# Optional: send runs through an Anthropic-compatible proxy instead of your own `claude` sign-in,
+# e.g. CLIProxyAPI with several accounts, so the board keeps going when one runs out of usage.
+# base_url = "http://127.0.0.1:8317"
+# auth_token_command = ["secret", "get", "PROXY_KEY"]  # only if the proxy checks API keys; run on every check
 
 # Optional overrides for automatic fallback when Claude fails. Codex must be signed in.
 [codex]
