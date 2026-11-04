@@ -616,7 +616,10 @@ button.kb-row {
   .nav-i .lbl { display: none; }
   .nav-i .ic { width: 18px; height: 18px; }
   .nav-i .ic svg { width: 17px; height: 17px; }
-  .nav-i .dot { width: 10px; height: 10px; margin: 0; }
+  /* Projects: the dot becomes a thin color bar on the row's left edge, so the caption doesn't sit under a dot of its own. */
+  .nav-i.proj { padding: 6px 4px 6px 8px; }
+  .nav-i.proj .ic { display: contents; }
+  .nav-i.proj .dot { position: absolute; left: 2px; top: 7px; bottom: 7px; width: 3px; height: auto; border-radius: 2px; margin: 0; }
   /* Counts become small badges on the icon's corner; project dots go without. */
   .nav-i .ct {
     position: absolute; top: 0; left: calc(50% + 7px);
@@ -656,6 +659,10 @@ button.kb-row {
   .nav-i:not(.proj) .cap { display: none; }
   .nav-i .ct { position: static; min-width: 0; height: auto; padding: 0; background: none; color: var(--mut); font-size: 11px; font-weight: 400; line-height: inherit; }
   .nav-i.proj .ct { display: inline; }
+  /* The toolbar has room beside the caption, so projects keep their dot instead of the rail's edge bar. */
+  .nav-i.proj { padding: 6px 8px; }
+  .nav-i.proj .ic { display: grid; width: 16px; height: 16px; }
+  .nav-i.proj .dot { position: static; width: 8px; height: 8px; border-radius: 50%; }
   #sb-foot { border-top: 0; padding: 0; flex: none; }
   #refresh { -webkit-app-region: no-drag; padding: 6px 8px; flex-direction: row; }
   #refresh-label { display: none; }
