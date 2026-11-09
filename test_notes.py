@@ -97,6 +97,17 @@ class NotesTests(unittest.TestCase):
             dbmod.main()
         kinds = [r[0] for r in self.db.execute("SELECT kind FROM work_events")]
         self.assertEqual(kinds, ["update"])
+        # Nor can it overwrite an old row, the user's note history included.
+        with self.db:
+            notes.add(self.db, "task", "t", "Real note")
+        for sql in ["REPLACE INTO work_events (id, at, kind, text) VALUES (2, 'x', 'note', 'Added: forged')",
+                    "REPLACE INTO work_events (id, at, kind, text) VALUES (1, 'x', 'update', 'Rewritten')",
+                    "INSERT INTO work_events (at, kind, text) SELECT at, 'note', 'copy' FROM work_events"]:
+            with self.subTest(sql=sql), patch.object(dbmod, "DB", self.path), \
+                    patch.object(sys, "argv", ["db.py", "exec", sql]), self.assertRaises(SystemExit):
+                dbmod.main()
+        self.assertEqual([r[0] for r in self.db.execute("SELECT text FROM work_events ORDER BY id")],
+                         ["Real news", "Added: Real note"])
 
 
 class MigrationTests(unittest.TestCase):
@@ -135,7 +146,11 @@ class FocusTests(unittest.TestCase):
     def test_last_refresh_is_the_last_full_check(self):
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(config, "DIR", tmp):
-                self.assertIn("newest checked_at", config.last_refresh())
+                self.assertIn("past 7 days", config.last_refresh())
+                for stamp in ["", "garbage", "2026-11-09"]:
+                    with open(os.path.join(tmp, "last_check"), "w") as f:
+                        f.write(stamp)
+                    self.assertIn("past 7 days", config.last_refresh())
                 with open(os.path.join(tmp, "last_check"), "w") as f:
                     f.write("2026-11-09 10:01\n")
                 self.assertIn("finished at 2026-11-09 10:01", config.last_refresh())

@@ -624,12 +624,12 @@ export function toggleNotes() {
 }
 
 // Where a project's notes were opened from (the view, the task shown, the panel's scroll), to go back there.
-let notesBack: { view: View; key: string | null; held: boolean; top: number } | null = null;
+let notesBack: { view: View; key: string | null; top: number } | null = null;
 
 // A project's notes in the details panel. From a task in another view (a project note on its panel), go to
 // the project with that task selected; "Back to task" returns to the view it came from.
 export async function openProjectNotes(pkey: string, fromTask: string | null = null) {
-  if (!ui.notesView) notesBack = { view: ui.view, key: items()[ui.sel]?.key ?? ui.held, held: !!ui.held, top: el("detail")?.scrollTop ?? 0 };
+  if (!ui.notesView) notesBack = { view: ui.view, key: items()[ui.sel]?.key ?? ui.held, top: el("detail")?.scrollTop ?? 0 };
   if (ui.view !== "project:" + pkey) {
     go(`project:${pkey}`);
     if (fromTask) selectInProject(fromTask);
@@ -646,7 +646,8 @@ export async function closeProjectNotes() {
   if (b && b.view !== ui.view) {
     ui.view = b.view;
     const i = b.key ? items().findIndex((t) => t.key === b.key) : -1;
-    if (i < 0 && b.held && b.key && taskByKey(b.key)) { ui.held = b.key; ui.sel = -1; }
+    // The task left that view while its notes were open (a check moved it): keep showing it.
+    if (i < 0 && b.key && taskByKey(b.key)) { ui.held = b.key; ui.sel = -1; }
     else ui.sel = i >= 0 ? i : isProjectView() ? -1 : 0;
   }
   await tick();

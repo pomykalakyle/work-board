@@ -196,10 +196,11 @@ def last_refresh():
     """When the last full check finished, for the agent's "new since the last refresh". Quick checks set
     checked_at on the rows they touch, so the newest checked_at can be later than the last full sweep."""
     stamp = (_read(os.path.join(DIR, "last_check")) or "").strip()
-    if stamp:
+    if re.fullmatch(r"\d{4}-\d\d-\d\d \d\d:\d\d", stamp):
         return (f"The last refresh (the last full check) finished at {stamp} local time. Quick checks started by a"
                 " note also set checked_at, so don't take the newest checked_at as the last refresh.")
-    return "The newest checked_at in work_tasks is the last refresh."
+    return ("No full check has finished yet (or its time is unreadable), so treat the past 7 days as new. Don't go by"
+            " checked_at: quick checks started by a note set it too.")
 
 
 def prompt(c):

@@ -39,8 +39,18 @@ def guard(action, arg1, _arg2, _db, _trigger):
     return sqlite3.SQLITE_DENY
 
 
-def note_events(db):
-    return db.execute("SELECT count(*) FROM work_events WHERE kind = 'note'").fetchone()[0]
+def history(db):
+    """Every history row by id, as {column: value} (whatever columns this board's table has)."""
+    cur = db.execute("SELECT * FROM work_events")
+    cols = [d[0] for d in cur.description]
+    return {r[0]: dict(zip(cols, r)) for r in cur}
+
+
+def history_ok(before, after):
+    """exec only adds history: every old row is still there unchanged (REPLACE could overwrite one),
+    and no new row is of kind 'note', which says the user changed a note (only notes.py writes those)."""
+    return all(after.get(i) == r for i, r in before.items()) and all(
+        r.get("kind") != "note" for i, r in after.items() if i not in before)
 
 
 def run_query(sql, params):
@@ -74,18 +84,17 @@ def main():
         db = sqlite3.connect(DB)
         db.set_authorizer(guard)
         with db:
-            notes_before = note_events(db)
+            before = history(db)
             cur = db.execute(sql, params)
-            # History of kind 'note' says the user changed a note; only notes.py (the app) writes it.
             # Raising inside the transaction rolls the statement back.
-            if note_events(db) != notes_before:
-                raise sqlite3.DatabaseError("not authorized: note history")
+            if not history_ok(before, history(db)):
+                raise sqlite3.DatabaseError("not authorized: history")
         print(f"{cur.rowcount} row(s) changed")
     except sqlite3.DatabaseError as e:
         if "not authorized" in str(e):
             sys.exit("Not allowed: query and export only read." if mode != "exec" else
                      "Not allowed: exec only inserts or updates work_tasks and work_standup, and adds work_events rows"
-                     " (never of kind 'note').")
+                     " (never of kind 'note', and never replacing an old one).")
         sys.exit(f"SQLite error: {e}")
 
 
