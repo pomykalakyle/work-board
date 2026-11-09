@@ -32,7 +32,7 @@ Applying the ranking rules:
 - Every run, check that each task that isn't done still fits its project, and move it or clear its project_key if not. Check each open task's tier, numbers and reasons against these rules and fix any that don't fit, including filling in a missing or vague reason. Never change a field listed in pinned.
 
 Steps:
-1. Read both tables. The newest checked_at in work_tasks is the last refresh.
+1. Read the tables. {{LAST_REFRESH}}
 2. Bring the board up to date. Two jobs, both every run:
  - Catch everything new for the user since the last refresh. Always check direct pings: DMs, group DMs and messages that mention the user. Then look further: other asks of the user, re-pings and "any update?" follow-ups, customers reporting problems, answers to blocked tasks, decisions, promises the user made ("will do", "I'll get back to you"), and new threads, PRs or issues that should be tasks.
  - Make sure every open and blocked task still matches its sources. The board's own notes can be stale: when a task's status, next step or reasons could have changed, go back to the threads, PRs and docs behind it, read them to the end, and note who spoke last. A quiet thread can still show that a next step is already done or no longer right.

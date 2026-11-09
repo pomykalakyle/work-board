@@ -1,6 +1,7 @@
 """The user's notes: notes.py's writes and history, the agent's guard, the schema migration and the quick check's prompt."""
 import os
 import sqlite3
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -82,6 +83,21 @@ class NotesTests(unittest.TestCase):
         con.execute("SELECT * FROM work_notes").fetchall()
         con.close()
 
+    def test_agent_cannot_forge_note_history(self):
+        """A history row of kind 'note' says the user changed a note, so db.py exec refuses to add one."""
+        self.db.commit()
+        with patch.object(dbmod, "DB", self.path), patch.object(sys, "argv", ["db.py", "exec",
+                "INSERT INTO work_events (at, task_key, kind, text) VALUES ('x', 't', 'note', 'Added: fake')"]), \
+                self.assertRaises(SystemExit) as e:
+            dbmod.main()
+        self.assertIn("never of kind 'note'", str(e.exception))
+        with patch.object(dbmod, "DB", self.path), patch.object(sys, "argv", ["db.py", "exec",
+                "INSERT INTO work_events (at, task_key, kind, text) VALUES ('x', 't', 'update', 'Real news')"]), \
+                patch("builtins.print"):
+            dbmod.main()
+        kinds = [r[0] for r in self.db.execute("SELECT kind FROM work_events")]
+        self.assertEqual(kinds, ["update"])
+
 
 class MigrationTests(unittest.TestCase):
     def test_old_event_table_gains_note_kind_and_project(self):
@@ -116,10 +132,19 @@ class FocusTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 config.focus_text(bad)
 
+    def test_last_refresh_is_the_last_full_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(config, "DIR", tmp):
+                self.assertIn("newest checked_at", config.last_refresh())
+                with open(os.path.join(tmp, "last_check"), "w") as f:
+                    f.write("2026-11-09 10:01\n")
+                self.assertIn("finished at 2026-11-09 10:01", config.last_refresh())
+
     def test_prompt_placeholders_filled(self):
         with open(os.path.join(DIR, "prompt.md")) as f:
             text = f.read()
         self.assertIn("{{FOCUS}}", text)
+        self.assertIn("{{LAST_REFRESH}}", text)
         self.assertIn("note:ID", text)
 
 

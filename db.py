@@ -39,6 +39,10 @@ def guard(action, arg1, _arg2, _db, _trigger):
     return sqlite3.SQLITE_DENY
 
 
+def note_events(db):
+    return db.execute("SELECT count(*) FROM work_events WHERE kind = 'note'").fetchone()[0]
+
+
 def run_query(sql, params):
     db = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
     db.set_authorizer(lambda action, *rest: sqlite3.SQLITE_OK if action in READ_ONLY_OK else sqlite3.SQLITE_DENY)
@@ -70,12 +74,18 @@ def main():
         db = sqlite3.connect(DB)
         db.set_authorizer(guard)
         with db:
+            notes_before = note_events(db)
             cur = db.execute(sql, params)
+            # History of kind 'note' says the user changed a note; only notes.py (the app) writes it.
+            # Raising inside the transaction rolls the statement back.
+            if note_events(db) != notes_before:
+                raise sqlite3.DatabaseError("not authorized: note history")
         print(f"{cur.rowcount} row(s) changed")
     except sqlite3.DatabaseError as e:
         if "not authorized" in str(e):
             sys.exit("Not allowed: query and export only read." if mode != "exec" else
-                     "Not allowed: exec only inserts or updates work_tasks and work_standup, and adds work_events rows.")
+                     "Not allowed: exec only inserts or updates work_tasks and work_standup, and adds work_events rows"
+                     " (never of kind 'note').")
         sys.exit(f"SQLite error: {e}")
 
 

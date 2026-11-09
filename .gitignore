@@ -9,6 +9,7 @@ board.json
 reports.md
 logs/
 .lock/
+.render-lock/
 *.bak-*
 __pycache__/
 

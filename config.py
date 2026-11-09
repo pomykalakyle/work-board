@@ -192,6 +192,16 @@ def focus_text(scope):
             " or NO_UPDATE.")
 
 
+def last_refresh():
+    """When the last full check finished, for the agent's "new since the last refresh". Quick checks set
+    checked_at on the rows they touch, so the newest checked_at can be later than the last full sweep."""
+    stamp = (_read(os.path.join(DIR, "last_check")) or "").strip()
+    if stamp:
+        return (f"The last refresh (the last full check) finished at {stamp} local time. Quick checks started by a"
+                " note also set checked_at, so don't take the newest checked_at as the last refresh.")
+    return "The newest checked_at in work_tasks is the last refresh."
+
+
 def prompt(c):
     first, _, _ = schedule(c)
     focus = focus_text(os.environ.get("FOCUS", ""))
@@ -199,7 +209,7 @@ def prompt(c):
             "the first run of the day" if datetime.datetime.now().hour == first else "a later run, not the first of the day")
     with open(os.path.join(DIR, "prompt.md")) as f:
         t = f.read()
-    for k, v in {"NOW": os.environ["NOW"], "RUN_KIND": kind, "FOCUS": focus, "ABOUT": about(c), "PREFERENCES": preferences(),
+    for k, v in {"NOW": os.environ["NOW"], "RUN_KIND": kind, "FOCUS": focus, "LAST_REFRESH": last_refresh(), "ABOUT": about(c), "PREFERENCES": preferences(),
                  "SOURCES": sources(c), "RANKING": ranking(), "STANDUP": "" if focus else standup(c)}.items():
         t = t.replace("{{" + k + "}}", v)
     return t

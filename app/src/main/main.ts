@@ -326,7 +326,8 @@ function renderBoard(): Promise<void> {
 
 async function changeNote(args: string[]): Promise<number | null> {
   const out = await notesPy(args);
-  await renderBoard();
+  // The note is saved now. If the redraw fails, the quick check's own redraw shows it a minute later.
+  await renderBoard().catch(() => {});
   try { return JSON.parse(out).id ?? null; } catch { return null; }
 }
 

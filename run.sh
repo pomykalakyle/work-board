@@ -39,11 +39,30 @@ subprocess.run(["osascript", "-e", "on run argv", "-e", "display notification (i
 # The board data handed to render_board.py goes in a folder only this user can read, removed on exit.
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/work-board.XXXXXX")"
 HOLD_LOCK=0
-trap '[ $HOLD_LOCK = 1 ] && rmdir "$LOCK"; rm -rf "$TMP"' EXIT
+HOLD_RENDER=0
+trap '[ $HOLD_LOCK = 1 ] && rmdir "$LOCK"; [ $HOLD_RENDER = 1 ] && rmdir "$DIR/.render-lock"; rm -rf "$TMP"' EXIT
 
 # Rebuild board.json and board.html from work.db. Every task, done ones included: the app lists a
 # project's done tasks; render_board.py keeps board.html to today's.
 render() {
+  # Renders run outside the refresh lock (after a note change, during a check), so take turns: export
+  # and publish together, or an older snapshot could replace a newer board.json.
+  local waited=0
+  until mkdir "$DIR/.render-lock" 2>/dev/null; do
+    waited=$((waited + 1))
+    # A render takes a second or two; one held for a minute was left by a killed run.
+    if [ $waited -ge 600 ]; then echo "render lock held for a minute; taking it over"; rmdir "$DIR/.render-lock"; waited=0; fi
+    sleep 0.1
+  done
+  HOLD_RENDER=1
+  render_board_locked
+  local rc=$?
+  rmdir "$DIR/.render-lock"
+  HOLD_RENDER=0
+  return $rc
+}
+
+render_board_locked() {
   python3 -I db.py export "SELECT task_key, title, status, tier, tier_reason, impact, urgency, effort, impact_reason, urgency_reason, pinned, next_step, blocked_on, link, done_at, project_key, source FROM work_tasks" "$TMP/tasks.json"
   python3 -I db.py export "SELECT project_key, name, priority, stage, done_when, color, rank FROM work_projects WHERE status = 'active' ORDER BY rank" "$TMP/projects.json"
   # An event about a project rather than a task (a change to its notes) carries its own project_key.

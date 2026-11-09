@@ -604,7 +604,8 @@ async function change(scope: NoteScope, write: () => Promise<unknown>): Promise<
 
 export async function addNote(scope: NoteScope, text: string): Promise<boolean> {
   const ok = await change(scope, () => window.board.addNote(scope, text.trim()));
-  if (ok) drafts.delete(scope);
+  // Clear the field only if it still holds what was saved: text typed while saving stays.
+  if (ok && drafts.get(scope) === text) drafts.delete(scope);
   return ok;
 }
 export const editNote = (scope: NoteScope, id: number, text: string) => change(scope, () => window.board.editNote(id, text.trim()));
@@ -622,27 +623,36 @@ export function toggleNotes() {
   localStorage.setItem("notesOpen", ui.notesOpen ? "1" : "0");
 }
 
-// The details panel's scroll before a project's notes opened over it, to return there.
-let notesBackTop = 0;
+// Where a project's notes were opened from (the view, the task shown, the panel's scroll), to go back there.
+let notesBack: { view: View; key: string | null; held: boolean; top: number } | null = null;
 
-// A project's notes in the details panel. From a task elsewhere (a project note on its panel), go to the
-// project with that task selected, so "Back to task" returns to it.
+// A project's notes in the details panel. From a task in another view (a project note on its panel), go to
+// the project with that task selected; "Back to task" returns to the view it came from.
 export async function openProjectNotes(pkey: string, fromTask: string | null = null) {
+  if (!ui.notesView) notesBack = { view: ui.view, key: items()[ui.sel]?.key ?? ui.held, held: !!ui.held, top: el("detail")?.scrollTop ?? 0 };
   if (ui.view !== "project:" + pkey) {
     go(`project:${pkey}`);
     if (fromTask) selectInProject(fromTask);
-    notesBackTop = 0;
-  } else notesBackTop = el("detail")?.scrollTop ?? 0;
+  }
   ui.notesView = pkey;
   await tick();
   el("detail")!.scrollTop = 0;
 }
 
 export async function closeProjectNotes() {
+  const b = notesBack;
+  notesBack = null;
   ui.notesView = null;
+  if (b && b.view !== ui.view) {
+    ui.view = b.view;
+    const i = b.key ? items().findIndex((t) => t.key === b.key) : -1;
+    if (i < 0 && b.held && b.key && taskByKey(b.key)) { ui.held = b.key; ui.sel = -1; }
+    else ui.sel = i >= 0 ? i : isProjectView() ? -1 : 0;
+  }
   await tick();
   const d = el("detail");
-  if (d) d.scrollTop = notesBackTop;
+  if (d) d.scrollTop = b?.top ?? 0;
+  el("list")?.focus();
 }
 
 // A cited note: a project's in its notes view, a task's in that task's open notes section.
