@@ -526,7 +526,7 @@ type Snap = Record<string, string>;
 export interface NoteCheck {
   phase: "saving" | "saved" | "checking" | "done" | "saveError" | "checkError";
   id: number;        // the check's id, so an older check's result can't stand in for a newer one
-  text: string;      // the result ("Checked · Next step changed") or the error
+  text: string;      // the result ("Re-reviewed · Next step changed") or the error
   before?: Snap;     // the board before the check, to say what it changed
 }
 export const noteChecks = new SvelteMap<string, NoteCheck>();
@@ -553,7 +553,7 @@ function snapshot(scope: string): Snap {
 
 const FIELD_WORD: Record<string, string> = { next: "next step", tier: "tier", rank: "rank", blockedOn: "who it waits on", project: "project", scores: "scores" };
 
-// "Checked · Now parked, next step changed", "Checked · No board changes", or for a project "Checked 4 tasks · 2 changed".
+// "Re-reviewed · Now parked, next step changed", "Re-reviewed · No board changes", or for a project "Re-reviewed 4 tasks · 2 changed".
 function describe(scope: string, before: Snap): string {
   if (scope.startsWith("task:")) {
     const key = scope.slice(5);
@@ -568,11 +568,11 @@ function describe(scope: string, before: Snap): string {
       const list = names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names.at(-1) : names[0];
       parts.push((parts.length ? list : list[0].toUpperCase() + list.slice(1)) + " changed");
     }
-    return "Checked · " + (parts.length ? parts.join(", ") : "No board changes");
+    return "Re-reviewed · " + (parts.length ? parts.join(", ") : "No board changes");
   }
   const keys = [...new Set([...Object.keys(before), ...scopeKeys(scope)])];
   const changed = keys.filter((k) => before[k] !== JSON.stringify(taskSnap(k))).length;
-  return `Checked ${keys.length} task${keys.length === 1 ? "" : "s"} · ` + (changed ? `${changed} changed` : "No board changes");
+  return `Re-reviewed ${keys.length} task${keys.length === 1 ? "" : "s"} · ` + (changed ? `${changed} changed` : "No board changes");
 }
 
 // Start the quick check (or check again after a failure).

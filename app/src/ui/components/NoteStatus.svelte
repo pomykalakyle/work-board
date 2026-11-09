@@ -4,17 +4,16 @@
   // so it shows with the notes closed too.
   import { noteChecks, checkScope } from "../lib/state.svelte";
   let { scope, what }: { scope: NoteScope; what: string } = $props();
-  const label = $derived(scope.startsWith("task:") ? "Check this task" : "Check this project");
   const c = $derived(noteChecks.get(scope));
 </script>
 
 {#if c}
   <div class={["nt-status", "nt-" + c.phase]} role="status" aria-live="polite">
     {#if c.phase === "saving"}<span class="nt-spin" aria-hidden="true"></span>Saving…
-    {:else if c.phase === "saved"}Saved<button class="pf-btn" title={`Runs a quick Claude check of ${what} (about a minute)`} onclick={() => checkScope(scope)}>{label}</button>
-    {:else if c.phase === "checking"}<span class="nt-spin" aria-hidden="true"></span>Checking {what}…
+    {:else if c.phase === "saved"}Saved<button class="pf-btn" title={`Claude reviews ${what} again with your notes (about a minute)`} onclick={() => checkScope(scope)}>Re-review</button>
+    {:else if c.phase === "checking"}<span class="nt-spin" aria-hidden="true"></span>Re-reviewing…
     {:else if c.phase === "done"}{c.text}
     {:else if c.phase === "saveError"}Couldn't save the note{c.text ? `: ${c.text}` : ""}
-    {:else}Check failed{c.text ? `: ${c.text}` : ""}<button class="more nt-again" onclick={() => checkScope(scope)}>Check again</button>{/if}
+    {:else}Re-review failed{c.text ? `: ${c.text}` : ""}<button class="more nt-again" onclick={() => checkScope(scope)}>Try again</button>{/if}
   </div>
 {/if}
