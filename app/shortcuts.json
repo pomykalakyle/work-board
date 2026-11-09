@@ -6,7 +6,7 @@
   { "id": "openLink", "group": "Task lists", "label": "Open the task's link", "scope": "list", "defaults": ["Enter"] },
   { "id": "toggleWhy", "group": "Task lists", "label": "Show or hide Why this ranking", "scope": "list", "defaults": ["r"] },
   { "id": "addNote", "group": "Task lists", "label": "Write a note on the task", "scope": "list", "defaults": ["c"] },
-  { "id": "saveNote", "group": "Notes", "label": "Save the note and check", "scope": "note", "defaults": ["Enter"] },
+  { "id": "saveNote", "group": "Notes", "label": "Save the note", "scope": "note", "defaults": ["Enter"] },
   { "id": "openTask", "group": "History", "label": "Open the task", "scope": "history", "defaults": ["Enter"] },
   { "id": "toggleOlder", "group": "History", "label": "Show or hide a task's older updates", "scope": "history", "defaults": ["Space"] },
   { "id": "goNext", "group": "Go to", "label": "Do next", "scope": "global", "defaults": ["Meta+1"] },

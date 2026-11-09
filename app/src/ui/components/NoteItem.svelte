@@ -53,7 +53,7 @@
 {#if mode === "edit"}
   <textarea class="pf-in nt-in" data-note-edit={n.id} aria-label="Edit note" bind:value={draft} onkeydown={editKey}></textarea>
   <div class="nt-btns">
-    <button class="pf-btn primary" disabled={busy || !draft.trim() || draft.trim() === n.text} onclick={saveEdit}>Save changes & check</button>
+    <button class="pf-btn primary" disabled={busy || !draft.trim() || draft.trim() === n.text} onclick={saveEdit}>Save changes</button>
     <button class="pf-btn" onclick={() => (mode = "view")}>Cancel</button>
   </div>
 {:else}
@@ -61,7 +61,7 @@
   {#if mode === "remove"}
     <div class="nt-btns">
       <span class="nt-ask">Stop applying this note?</span>
-      <button class="pf-btn primary" disabled={busy} onclick={remove}>Remove & check</button>
+      <button class="pf-btn primary" disabled={busy} onclick={remove}>Remove</button>
       <button class="pf-btn" onclick={() => (mode = "view")}>Cancel</button>
     </div>
   {:else}

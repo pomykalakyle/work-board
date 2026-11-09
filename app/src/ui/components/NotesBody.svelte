@@ -1,6 +1,6 @@
 <script lang="ts">
   // A task's or project's notes, open: the field for a new note first (one line that grows as you
-  // type; Enter saves and checks, Shift+Enter is a new line), then the project's notes that apply
+  // type; Enter saves, Shift+Enter is a new line; checking is a separate button once saved), then the project's notes that apply
   // (on a task, read-only), then the notes themselves, newest first, two at first.
   import { drafts, notesShown, NOTES_FIRST, noteChecks, addNote, isAction } from "../lib/state.svelte";
   import NoteItem from "./NoteItem.svelte";
@@ -33,7 +33,7 @@
   bind:value={() => draft, (v) => (v ? drafts.set(scope, v) : drafts.delete(scope))} onkeydown={key}></textarea>
 {#if draft.trim()}
   <div class="nt-btns">
-    <button class="pf-btn primary" disabled={busy} title={`Saves the note and checks ${what} again (about a minute)`} onclick={save}>Save & check</button>
+    <button class="pf-btn primary" disabled={busy} onclick={save}>Save</button>
   </div>
 {/if}
 <NoteStatus {scope} {what} />

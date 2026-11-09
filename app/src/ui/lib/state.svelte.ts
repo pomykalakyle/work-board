@@ -524,7 +524,7 @@ export const NOTES_FIRST = 2;
 
 type Snap = Record<string, string>;
 export interface NoteCheck {
-  phase: "saving" | "checking" | "done" | "saveError" | "checkError";
+  phase: "saving" | "saved" | "checking" | "done" | "saveError" | "checkError";
   id: number;        // the check's id, so an older check's result can't stand in for a newer one
   text: string;      // the result ("Checked · Next step changed") or the error
   before?: Snap;     // the board before the check, to say what it changed
@@ -589,7 +589,7 @@ export async function checkScope(scope: NoteScope) {
   }
 }
 
-// Save a change to a note, then check. False (with the error showing) when the change didn't save.
+// Save a change to a note; checking is a separate button. False (with the error showing) when it didn't save.
 async function change(scope: NoteScope, write: () => Promise<unknown>): Promise<boolean> {
   noteChecks.set(scope, { phase: "saving", id: 0, text: "" });
   try {
@@ -598,7 +598,7 @@ async function change(scope: NoteScope, write: () => Promise<unknown>): Promise<
     noteChecks.set(scope, { phase: "saveError", id: 0, text: ipcError(e) });
     return false;
   }
-  await checkScope(scope);
+  noteChecks.set(scope, { phase: "saved", id: 0, text: "" });
   return true;
 }
 
