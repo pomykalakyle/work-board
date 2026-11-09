@@ -1,7 +1,7 @@
 // Pure text and date helpers shared by the components.
 
 export const TIER_NAME: Record<Tier, string> = { must: "Must", should: "Should", later: "Later" };
-export const KIND_WORD: Record<string, string> = { added: "Added", blocked: "Blocked", unblocked: "Unblocked", done: "Done" };
+export const KIND_WORD: Record<string, string> = { added: "Added", blocked: "Blocked", unblocked: "Unblocked", done: "Done", note: "Your note" };
 export const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -12,11 +12,11 @@ export const shortProject = (name: string) => name.split(":")[0];
 
 export interface Cite { label: string; url: string }
 
-// Reasons can cite sources as Markdown links, [label](https://...).
-const LINK = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+// Reasons can cite sources as Markdown links, [label](https://...), or the user's notes as [your note](note:12).
+const LINK = /\[([^\]]+)\]\((https?:\/\/[^)\s]+|note:\d+)\)/g;
 // A reason is one sentence followed by its citations. Split them so the
 // sentence reads clean and the sources sit on their own line under it.
-const TRAILING_CITES = /[\s(]*(\[[^\]]+\]\(https?:\/\/[^)\s]+\)[\s,;]*)+\)?\s*\.?\s*$/;
+const TRAILING_CITES = /[\s(]*(\[[^\]]+\]\((?:https?:\/\/[^)\s]+|note:\d+)\)[\s,;]*)+\)?\s*\.?\s*$/;
 export function splitReason(text: string | null | undefined): { sentence: string; cites: Cite[] } {
   const t = text || "";
   const tail = t.match(TRAILING_CITES);
@@ -25,7 +25,7 @@ export function splitReason(text: string | null | undefined): { sentence: string
     .replace(/^(must|should|later)\s*[:\-]\s*/i, "") // the tier is already shown next to it
     .replace(/^./, (c) => c.toUpperCase());
   const cites = [...(tail ? tail[0] : "").matchAll(LINK)].map((m) => ({ label: m[1], url: m[2] }));
-  return { sentence: sentence && !/[.!?]$/.test(sentence) ? sentence + "." : sentence, cites };
+  return { sentence: sentence && !/[.!?…]$/.test(sentence) ? sentence + "." : sentence, cites };
 }
 
 // Long text reads as a blob in the side panel: split it into sentences to show one per line.

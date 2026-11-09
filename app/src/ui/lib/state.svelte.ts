@@ -55,6 +55,12 @@ class AppState {
   theme = $state.raw<ThemeState>(window.themes.initial);
   // "Why this ranking": one app-wide preference, closed at first.
   whyOpen = $state(localStorage.getItem("whyOpen") === "1");
+  // A task's "Your notes" section: one app-wide preference, closed at first.
+  notesOpen = $state(localStorage.getItem("notesOpen") === "1");
+  // The project whose notes fill the details panel (its header's notes button), or null.
+  notesView = $state<string | null>(null);
+  // A task kept in the details panel after a note's check moved it out of this list (null: none).
+  held = $state<string | null>(null);
   // A project's full "Done when" text (clamped to two lines when closed): one app-wide preference.
   goalOpen = $state(localStorage.getItem("goalOpen") === "1");
   // The detail panel's width and whether it's hidden.
@@ -130,7 +136,7 @@ function revealDone(p: Project, key: string) {
 // Whether an event belongs to a project. Events carry their task's project, which also
 // covers done tasks that are no longer in board.json; news about no task belongs to none.
 export const inProject = (p: Project) => (e: BoardEvent) =>
-  !!e.key && (e.project === p.key || p.tasks.some((t) => t.key === e.key));
+  e.key ? e.project === p.key || p.tasks.some((t) => t.key === e.key) : e.project === p.key; // the latter: its notes
 export const rankedOf = (key: string) => ui.data?.ranked.find((r) => r.key === key);
 export const eventsOf = (key: string) => (ui.data?.events || []).filter((e) => e.key === key);
 
@@ -215,6 +221,8 @@ export const sourcesText = () => ui.data?.stamp.match(/ from (.*)/)?.[1] || "you
 // ---------- actions ----------
 
 export function go(view: View) {
+  ui.notesView = null;
+  ui.held = null;
   ui.hist.scope = null;
   ui.hist.back = null;
   if (view === "history") ui.hist.selId = null;
@@ -229,7 +237,9 @@ export function go(view: View) {
 }
 
 export function select(i: number) {
-  if (ui.sel < 0 && i >= 0 && isProjectView()) actTop.set(ui.view, el("detail")?.scrollTop ?? 0);
+  if (ui.sel < 0 && i >= 0 && isProjectView() && !ui.notesView && !ui.held) actTop.set(ui.view, el("detail")?.scrollTop ?? 0);
+  ui.notesView = null;
+  ui.held = null;
   ui.sel = i;
 }
 
@@ -263,6 +273,8 @@ export function openLink(t: ListTask | undefined) {
 export function openTask(key: string) {
   const at = findTask(key);
   if (!at) return;
+  ui.notesView = null;
+  ui.held = null;
   ui.hist.scope = null;
   ui.view = at.view;
   if (at.view.startsWith("project:")) {
@@ -370,7 +382,8 @@ export function dragDetailTo(clientX: number) {
 // picks the first task and up the last.
 export function listKey(e: KeyboardEvent) {
   if (e.key === "Escape") {
-    if (isProjectView() && ui.sel >= 0) { showActivity(); e.preventDefault(); }
+    if (ui.notesView) { closeProjectNotes(); e.preventDefault(); }
+    else if (isProjectView() && ui.sel >= 0) { showActivity(); e.preventDefault(); }
     return;
   }
   const n = items().length;
@@ -390,6 +403,9 @@ export function listKey(e: KeyboardEvent) {
     e.preventDefault();
   } else if (isAction(e, "toggleWhy")) {
     toggleWhy();
+    e.preventDefault();
+  } else if (isAction(e, "addNote")) {
+    focusNote();
     e.preventDefault();
   }
 }
@@ -461,18 +477,197 @@ export function setData(data: Board | null) {
     ui.sel = 0;
     return;
   }
-  // No selection (a project's activity) stays that way.
+  // No selection (a project's activity, or a held task) stays that way.
   if (ui.sel < 0) return;
   // In a project, follow the task by key: one that just got done shows the done tasks,
   // and one that's gone goes back to the activity, rather than selecting whatever moved into its place.
   const p = currentProject();
-  if (p && keep) {
-    revealDone(p, keep);
-    ui.sel = items().findIndex((t) => t.key === keep);
+  if (p && keep) revealDone(p, keep);
+  const idx = items().findIndex((t) => t.key === keep);
+  // A note's check moved the task out of this list: keep showing it, since the result is what the user is waiting for.
+  if (idx < 0 && keep && noteChecks.has("task:" + keep) && taskByKey(keep)) {
+    ui.held = keep;
+    ui.sel = -1;
     return;
   }
-  const idx = items().findIndex((t) => t.key === keep);
-  ui.sel = idx >= 0 ? idx : Math.min(ui.sel, Math.max(0, items().length - 1));
+  if (p && keep) ui.sel = idx;
+  else ui.sel = idx >= 0 ? idx : Math.min(ui.sel, Math.max(0, items().length - 1));
+}
+
+// ---------- notes ----------
+// The user's notes on a task or project (board.json's notes, written through notes.py). Saving one
+// starts a quick check of that task or project; its state per scope ("task:KEY" or "project:KEY")
+// lives in noteChecks until the app quits, so the result stays visible after switching tasks.
+
+export const taskNotes = (key: string) => (ui.data?.notes || []).filter((n) => n.task === key);
+export const projectNotes = (key: string) => (ui.data?.notes || []).filter((n) => n.project === key);
+export const noteById = (id: number) => (ui.data?.notes || []).find((n) => n.id === id) ?? null;
+// The task's real project ("No project" can't have notes).
+export const notesProjectOf = (taskKey: string) => {
+  const p = projectOfKey(taskKey);
+  return p && p.key !== "none" ? p : null;
+};
+
+// A task wherever it is on the board: ranked (with its numbers), blocked, or in a project's list.
+export function taskByKey(key: string): ListTask | null {
+  const d = ui.data;
+  if (!d) return null;
+  return d.ranked.find((r) => r.key === key) ?? d.blocked.find((t) => t.key === key)
+    ?? d.projects.flatMap((p) => p.tasks).find((t) => t.key === key) ?? null;
+}
+
+// Unsent text per scope, kept across task switches (until the app quits).
+export const drafts = new SvelteMap<string, string>();
+// How many notes a task or project shows (until the app quits).
+export const notesShown = new SvelteMap<string, number>();
+export const NOTES_FIRST = 2;
+
+type Snap = Record<string, string>;
+export interface NoteCheck {
+  phase: "saving" | "checking" | "done" | "saveError" | "checkError";
+  id: number;        // the check's id, so an older check's result can't stand in for a newer one
+  text: string;      // the result ("Checked · Next step changed") or the error
+  before?: Snap;     // the board before the check, to say what it changed
+}
+export const noteChecks = new SvelteMap<string, NoteCheck>();
+
+const STATUS_WORD: Record<string, string> = { open: "open", blocked: "blocked", parked: "parked", done: "done", gone: "gone" };
+
+// What the board shows for a task, as text per field, to tell what a check changed.
+function taskSnap(key: string): Record<string, string> {
+  const t = taskByKey(key);
+  const r = rankedOf(key);
+  return {
+    status: t?.status ?? "gone", next: t?.next ?? "", tier: r?.tier ?? "", rank: String(r?.rank ?? ""),
+    blockedOn: t?.blockedOn ?? "", project: t?.project.name ?? "", scores: r ? r.factors.map((f) => f.value).join(",") : "",
+  };
+}
+const scopeKeys = (scope: string): string[] => {
+  if (scope.startsWith("task:")) return [scope.slice(5)];
+  const p = ui.data?.projects.find((x) => "project:" + x.key === scope);
+  return p ? p.tasks.filter((t) => t.status !== "done").map((t) => t.key) : [];
+};
+function snapshot(scope: string): Snap {
+  return Object.fromEntries(scopeKeys(scope).map((k) => [k, JSON.stringify(taskSnap(k))]));
+}
+
+const FIELD_WORD: Record<string, string> = { next: "next step", tier: "tier", rank: "rank", blockedOn: "who it waits on", project: "project", scores: "scores" };
+
+// "Checked · Now parked, next step changed", "Checked · No board changes", or for a project "Checked 4 tasks · 2 changed".
+function describe(scope: string, before: Snap): string {
+  if (scope.startsWith("task:")) {
+    const key = scope.slice(5);
+    const was = before[key] ? JSON.parse(before[key]) : {};
+    const now = taskSnap(key);
+    const parts: string[] = [];
+    if (was.status !== now.status) parts.push("Now " + STATUS_WORD[now.status]);
+    // A status change moves the tier and rank with it, so those aren't worth naming too.
+    const fields = Object.keys(FIELD_WORD).filter((f) => was[f] !== now[f] && !(parts.length && ["tier", "rank", "scores"].includes(f)));
+    if (fields.length) {
+      const names = fields.map((f) => FIELD_WORD[f]);
+      const list = names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names.at(-1) : names[0];
+      parts.push((parts.length ? list : list[0].toUpperCase() + list.slice(1)) + " changed");
+    }
+    return "Checked · " + (parts.length ? parts.join(", ") : "No board changes");
+  }
+  const keys = [...new Set([...Object.keys(before), ...scopeKeys(scope)])];
+  const changed = keys.filter((k) => before[k] !== JSON.stringify(taskSnap(k))).length;
+  return `Checked ${keys.length} task${keys.length === 1 ? "" : "s"} · ` + (changed ? `${changed} changed` : "No board changes");
+}
+
+// Start the quick check (or check again after a failure).
+export async function checkScope(scope: NoteScope) {
+  const before = snapshot(scope);
+  noteChecks.set(scope, { phase: "checking", id: -1, text: "", before });
+  try {
+    const id = await window.board.checkNotes(scope);
+    // A result can't arrive before the id: a check takes at least seconds.
+    const c = noteChecks.get(scope);
+    if (c && c.phase === "checking" && c.id === -1) noteChecks.set(scope, { ...c, id });
+  } catch (e) {
+    noteChecks.set(scope, { phase: "checkError", id: 0, text: ipcError(e) });
+  }
+}
+
+// Save a change to a note, then check. False (with the error showing) when the change didn't save.
+async function change(scope: NoteScope, write: () => Promise<unknown>): Promise<boolean> {
+  noteChecks.set(scope, { phase: "saving", id: 0, text: "" });
+  try {
+    await write();
+  } catch (e) {
+    noteChecks.set(scope, { phase: "saveError", id: 0, text: ipcError(e) });
+    return false;
+  }
+  await checkScope(scope);
+  return true;
+}
+
+export async function addNote(scope: NoteScope, text: string): Promise<boolean> {
+  const ok = await change(scope, () => window.board.addNote(scope, text.trim()));
+  if (ok) drafts.delete(scope);
+  return ok;
+}
+export const editNote = (scope: NoteScope, id: number, text: string) => change(scope, () => window.board.editNote(id, text.trim()));
+export const removeNote = (scope: NoteScope, id: number) => change(scope, () => window.board.removeNote(id));
+
+// From the main process: a quick check ended. board.json was sent just before, so the board is current.
+export function gotNoteCheck(r: NoteCheckResult) {
+  const c = noteChecks.get(r.scope);
+  if (!c || c.phase !== "checking" || c.id !== r.id) return; // an older check; a newer one is still running
+  noteChecks.set(r.scope, r.ok ? { phase: "done", id: r.id, text: describe(r.scope, c.before ?? {}) } : { phase: "checkError", id: r.id, text: "" });
+}
+
+export function toggleNotes() {
+  ui.notesOpen = !ui.notesOpen;
+  localStorage.setItem("notesOpen", ui.notesOpen ? "1" : "0");
+}
+
+// The details panel's scroll before a project's notes opened over it, to return there.
+let notesBackTop = 0;
+
+// A project's notes in the details panel. From a task elsewhere (a project note on its panel), go to the
+// project with that task selected, so "Back to task" returns to it.
+export async function openProjectNotes(pkey: string, fromTask: string | null = null) {
+  if (ui.view !== "project:" + pkey) {
+    go(`project:${pkey}`);
+    if (fromTask) selectInProject(fromTask);
+    notesBackTop = 0;
+  } else notesBackTop = el("detail")?.scrollTop ?? 0;
+  ui.notesView = pkey;
+  await tick();
+  el("detail")!.scrollTop = 0;
+}
+
+export async function closeProjectNotes() {
+  ui.notesView = null;
+  await tick();
+  const d = el("detail");
+  if (d) d.scrollTop = notesBackTop;
+}
+
+// A cited note: a project's in its notes view, a task's in that task's open notes section.
+export function showNote(n: Note) {
+  const shown = items()[ui.sel]?.key ?? ui.held;
+  if (n.project) { openProjectNotes(n.project, shown); return; }
+  if (!n.task) return;
+  if (shown !== n.task) openTask(n.task);
+  if (!ui.notesOpen) toggleNotes();
+  notesShown.set("task:" + n.task, Math.max(notesShown.get("task:" + n.task) ?? 0, taskNotes(n.task).length));
+}
+
+// The note field in the details panel (a task's, or a project's notes). c opens the task's notes first.
+export async function focusNote() {
+  if (!ui.notesView && !ui.notesOpen && (items()[ui.sel] || ui.held)) toggleNotes();
+  if (!ui.notesView && !items()[ui.sel] && !ui.held) {
+    const p = currentProject();
+    if (!p || p.key === "none") return;
+    await openProjectNotes(p.key);
+  }
+  showDetail();
+  await tick();
+  const input = el("note-input");
+  input?.focus();
+  input?.scrollIntoView({ block: "nearest" });
 }
 
 // ---------- preferences ----------

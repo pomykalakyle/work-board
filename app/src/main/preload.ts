@@ -19,6 +19,11 @@ const board: BoardApi = {
   reveal: (what) => ipcRenderer.invoke("reveal", what),
   copy: (text, html) => ipcRenderer.invoke("copy", text, html),
   onAction: (cb) => ipcRenderer.on("action", (_e, id: string) => cb(id)),
+  addNote: (scope, text) => ipcRenderer.invoke("notes:add", scope, text),
+  editNote: (id, text) => ipcRenderer.invoke("notes:edit", id, text),
+  removeNote: (id) => ipcRenderer.invoke("notes:remove", id),
+  checkNotes: (scope) => ipcRenderer.invoke("notes:check", scope),
+  onNoteCheck: (cb) => ipcRenderer.on("note-check", (_e, r: NoteCheckResult) => cb(r)),
 };
 contextBridge.exposeInMainWorld("board", board);
 

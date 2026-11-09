@@ -72,6 +72,8 @@ That server's README covers how to get a token. Leave its posting tool off (it i
 - Settings turns the automatic checks on or off, sets their hours and days, and shows which sources, model and effort the agent uses. ⌘, opens it.
 - Keyboard lists every shortcut. Each action can have up to two keys, so you can add letters for moving around (h/j/k/l, say) next to the arrow keys.
 
+When the board gets a task wrong, write a note on it. Open "Your notes" on the task's panel (or press c), type the correction, for example "Sam has taken this over; I'm not replying", and press Enter. That starts a quick check of just that task, about a minute, and the panel says what changed. Every later check follows the note until you remove it, and cites it as "your note" where it changed something. A project's header has the same for notes that apply to all of its tasks, new ones included. Notes and their edits show in the task's history.
+
 If you disagree with a score, ask a coding agent in this folder to pin it, for example "pin api-docs urgency 4". The hourly run never changes a pinned value.
 
 ## Cost
@@ -93,6 +95,7 @@ Your settings and data are in gitignored files: `config.toml`, `preferences.md`,
 The agent runs with a short list of allowed tools (`tools()` in `config.py`) in Claude Code's `dontAsk` mode, which turns down anything not on the list.
 It can read files only inside this folder, call three read-only Slack tools, and run read-only `gh` commands.
 Its one write path is `db.py`, and SQLite itself limits that to adding and updating tasks, adding history entries and writing the standup draft.
+Your notes are written only by the app (`notes.py`), so the agent can read them but not change them.
 Codex runs in a read-only sandbox with shell execution disabled and user config excluded.
 A restricted MCP bridge exposes the same read-only source commands and guarded `db.py` writes; Slack exposes only the three read tools.
 The prompt also tells it never to post, reply or comment anywhere.

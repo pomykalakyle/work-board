@@ -28,6 +28,7 @@
     move: "Works in every list.",
     list: "Works in task lists.",
     history: "Works on History.",
+    note: "Works while you type a note.",
     global: "Works anywhere. Plain keys pause while you type in a field; ⌘ and ⌃ shortcuts don't.",
   };
   // Shortcuts macOS and every app reserve, or keys that move between controls.
@@ -37,7 +38,9 @@
     "Meta+`": "switches windows", "Meta+Tab": "switches apps", "Meta+Space": "opens Spotlight", "Tab": "moves between controls", "Shift+Tab": "moves between controls",
   };
 
-  const overlaps = (a: string, b: string) => a === b || a === "global" || b === "global" || a === "move" || b === "move";
+  // Like main.ts: a note's text field sees only its own keys and the global ones.
+  const overlaps = (a: string, b: string) =>
+    a === b || a === "global" || b === "global" || ((a === "move" || b === "move") && a !== "note" && b !== "note");
   const changed = (a: ShortcutAction) => JSON.stringify(bindings[a.id] ?? []) !== JSON.stringify(a.defaults);
   const changedCount = $derived(actions.filter(changed).length);
   const labelOf = (id: string) => actions.find((a) => a.id === id)?.label ?? id;

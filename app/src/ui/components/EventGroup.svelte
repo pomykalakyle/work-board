@@ -42,7 +42,7 @@
       {#if onopen}
         <button class="hg-title link" title={openHint} onclick={(ev) => { ev.stopPropagation(); onopen(); }}>{g.title || g.key}</button>
       {:else}
-        <span class="hg-title">{g.key ? g.title || g.key : "General"}</span>
+        <span class="hg-title">{g.title || g.key || "General"}</span>
       {/if}
     </span>
     {#if project || status || now}

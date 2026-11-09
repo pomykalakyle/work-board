@@ -3,13 +3,16 @@
   // visible while a task is open: name, priority and stage, one line of counts, and
   // the "Done when" goal clamped to two lines.
   import type { Attachment } from "svelte/attachments";
-  import { ui, currentProject, viewTitle, toggleDetail, toggleGoal, inProject } from "../lib/state.svelte";
+  import { ui, currentProject, viewTitle, toggleDetail, toggleGoal, inProject, projectNotes, openProjectNotes, closeProjectNotes } from "../lib/state.svelte";
   import { parseAt, whenShort } from "../lib/text";
   import { PANEL } from "../lib/icons";
   import ThemeButton from "./ThemeButton.svelte";
 
   const p = $derived(currentProject());
   const title = $derived(viewTitle());
+  // The project's notes open in the details panel ("No project" has none).
+  const nNotes = $derived(p && p.key !== "none" ? projectNotes(p.key).length : 0);
+  const notesOn = $derived(!!p && ui.notesView === p.key);
   // "2 open · 1 blocked · 5 done · last activity today 11:31am".
   const values = $derived.by(() => {
     if (!p) return "";
@@ -39,7 +42,15 @@
       <ThemeButton />
     </div>
     <div class="ph-body">
-      {#if values}<div class="ph-vals">{values}</div>{/if}
+      {#if values || (p.key !== "none")}
+        <div class="ph-vals">
+          {values}{#if values && p.key !== "none"}<span aria-hidden="true">{" · "}</span>{/if}
+          {#if p.key !== "none"}
+            <button class={["more", "ph-notes", { on: notesOn }]} aria-pressed={notesOn} title="Notes that apply to every task in this project"
+              onclick={() => (notesOn ? closeProjectNotes() : openProjectNotes(p.key))}>{nNotes ? `Your project notes · ${nNotes}` : "Add a project note"}</button>
+          {/if}
+        </div>
+      {/if}
       {#if p.doneWhen}
         <div class="ph-goalrow">
           <div class={["ph-goal", { open: ui.goalOpen }]} {@attach measure(p.doneWhen)}>{p.doneWhen}</div>

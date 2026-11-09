@@ -71,7 +71,8 @@ interface Project {
 interface BoardEvent {
   at: string;
   key: string | null;
-  kind: "added" | "blocked" | "unblocked" | "done" | "update" | "priority"; // priority: a rank, tier or score move
+  // priority: a rank, tier or score move; note: the user added, edited or removed a note (notes.py)
+  kind: "added" | "blocked" | "unblocked" | "done" | "update" | "priority" | "note";
   title: string;
   taskStatus: string;
   // The task's project key, or null for news that isn't about one task. Set even for
@@ -109,6 +110,27 @@ interface Board {
   // The newest standup draft, or null when config.toml's [standup] is off.
   // Empty strings until the first check with it on writes one.
   standup: { day: string; text: string; updatedAt: string } | null;
+  // The user's notes in force, newest first. Missing from a board.json written before notes existed.
+  notes?: Note[];
+}
+
+// A note the user wrote on a task (task set) or a whole project (project set). The hourly check
+// follows it and cites it as [your note](note:ID) when it changes something because of it.
+interface Note {
+  id: number;
+  task: string | null;
+  project: string | null;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+}
+// "task:KEY" or "project:KEY": what a note is on, and what its quick check re-checks.
+type NoteScope = `task:${string}` | `project:${string}`;
+// A quick check finished: ok is false when it failed (the note itself is saved either way).
+interface NoteCheckResult {
+  scope: NoteScope;
+  id: number;
+  ok: boolean;
 }
 
 interface Theme {
@@ -159,13 +181,13 @@ interface Settings {
 }
 
 // shortcuts.json: every action a key can run, and where it works. "move" works in every list,
-// "list" in task lists, "history" on History, "global" anywhere outside a text field.
+// "list" in task lists, "history" on History, "note" in a note's text field, "global" anywhere outside a text field.
 interface ShortcutAction {
   id: string;
   group: string;
   label: string;
   where?: string;
-  scope: "move" | "list" | "history" | "global";
+  scope: "move" | "list" | "history" | "note" | "global";
   defaults: string[];
 }
 // Bindings are "Ctrl+Alt+Shift+Meta+key" strings, modifiers in that order, at most two per action.
@@ -195,6 +217,13 @@ interface BoardApi {
   // Puts both forms on the clipboard: apps like Slack paste the HTML (real links and bullets).
   copy(text: string, html: string): Promise<void>;
   onAction(cb: (id: string) => void): void;
+  // Notes: each change rebuilds board.json (and sends it) before it resolves. addNote resolves to the new note's id.
+  addNote(scope: NoteScope, text: string): Promise<number | null>;
+  editNote(id: number, text: string): Promise<void>;
+  removeNote(id: number): Promise<void>;
+  // Starts the quick check of a task or project and resolves to its id; onNoteCheck reports when it ends.
+  checkNotes(scope: NoteScope): Promise<number>;
+  onNoteCheck(cb: (r: NoteCheckResult) => void): void;
 }
 interface KeysApi {
   initial: ShortcutState;

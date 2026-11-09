@@ -205,6 +205,10 @@ body.page #page-pane { display: flex; }
 .why-tie { margin-top: 12px; font-size: 12px; color: var(--mut); }
 a.cite { color: var(--mut); text-decoration: none; white-space: nowrap; }
 a.cite:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 2px; }
+/* A cited note ("your note") opens the note in the app; one since removed is plain text. */
+.cite { color: var(--mut); white-space: nowrap; }
+button.cite { border: 0; background: none; padding: 0; font: inherit; }
+button.cite:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 2px; }
 .pin { color: var(--mut); font-style: italic; }
 .txt { font-size: 13px; line-height: 1.5; }
 .src { font-size: 12px; color: var(--mut); line-height: 1.45; }
@@ -309,6 +313,46 @@ ul.evs { list-style: none; margin: 0; padding: 0; }
 .ev-ctl .more { margin-top: 0; }
 .dimmer { color: var(--dim); }
 
+/* Your notes: a disclosure built like "Why this ranking", just above it. Closed, the newest note
+   and one project note show on a line each under the toggle, lined up with its label. */
+.why-box.notes-box { margin-bottom: 10px; }
+.nt-body { padding-top: 10px; }
+.nt-in { display: block; max-height: calc(1.45em * 5 + 10px); overflow-y: auto; }
+.nt-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 8px; }
+.nt-cost { font-size: 12px; color: var(--mut); }
+.nt-ask { font-size: 12.5px; }
+.nt-status { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 8px; font-size: 12px; color: var(--mut); }
+.nt-saveError, .nt-checkError { color: var(--amber); }
+.nt-status .more { margin: 0; }
+.nt-spin { flex: none; width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--fg) 22%, transparent); border-top-color: var(--fg); animation: spin .9s linear infinite; }
+.nt-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.nt-list li + li { margin-top: 6px; }
+.nt-list .nt-item + .nt-item { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.nt-text { font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.nt-text.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+/* Edit and Remove show on hover or keyboard focus; their space is kept, so nothing moves when they do. */
+.nt-meta { display: flex; align-items: center; gap: 12px; min-height: 24px; margin-top: 2px; font-size: 12px; color: var(--mut); }
+.nt-meta .more { margin: 0; }
+.nt-acts { display: flex; gap: 4px; margin-left: auto; opacity: 0; }
+.nt-item:hover .nt-acts, .nt-item:focus-within .nt-acts { opacity: 1; }
+.nt-acts .pf-btn { padding: 1px 8px; }
+.nt-k { color: var(--mut); }
+.nt-proj { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; width: 100%; padding: 0; border: 0; background: none; text-align: left; font-size: 12.5px; line-height: 1.45; color: var(--text2); }
+.nt-proj:hover { color: var(--fg); }
+.nt-peeks { display: flex; flex-direction: column; gap: 2px; padding: 0 12px 9px 34px; margin-top: -4px; }
+.nt-peek { display: flex; gap: 8px; min-width: 0; width: 100%; padding: 0; border: 0; background: none; text-align: left; font-size: 12.5px; line-height: 1.45; color: var(--text2); }
+.nt-peek:hover { color: var(--fg); }
+.nt-peek-t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nt-peek-n { flex: none; color: var(--dim); }
+.nt-closed-status .nt-status { margin: -4px 0 0; padding: 0 12px 9px 34px; }
+.nt-peeks + .nt-closed-status .nt-status { margin-top: -5px; }
+.nt-about { margin: 0 0 10px; font-size: 12.5px; color: var(--mut); }
+/* A task a note's check moved out of the list stays in the panel, with where it went. */
+.held { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin: 0 0 12px; font-size: 12px; color: var(--mut); }
+.held .more { margin: 0; }
+.k-note .ev-dot { background: color-mix(in srgb, var(--fg) 75%, var(--detail)); }
+.k-note .ev-kind { color: var(--fg); }
+
 /* A project's activity, in the details panel while no task is selected. */
 .pa-h { margin: 0 0 10px; font-size: 12px; font-weight: 600; color: var(--mut); }
 .pa .ev-day { margin: 14px 0 2px; }
@@ -331,6 +375,8 @@ body.proj #detail-pane > .pane-head { display: none; }
 .ph-sub { min-width: 0; color: var(--mut); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ph-body { padding: 0 20px 12px; margin-top: -10px; user-select: text; }
 .ph-vals { font-size: 12px; color: var(--mut); font-variant-numeric: tabular-nums; }
+.ph-notes { margin: 0; padding: 0; white-space: nowrap; }
+.ph-notes.on { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
 .ph-goalrow { display: flex; align-items: flex-end; gap: 14px; margin-top: 4px; }
 .ph-goal { flex: 1; min-width: 0; max-width: 900px; font-size: 13px; line-height: 1.45; color: var(--text2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .ph-goal.open { display: block; }

@@ -4,7 +4,7 @@
   // "How scoring works", "Preferences" and "Settings" are full pages instead of the list and detail panes; a project
   // adds a header above both panes. The panes are direct children of <body>, whose CSS
   // grid lays them out (style.css).
-  import { ui, onPage, isProjectView, setData, go, setTheme, applyLayout, listKey, historyKey, scoringKey, loadPrefs, loadSettings, gotSettings, actionFor, comboOf, inField, runAction } from "./lib/state.svelte";
+  import { ui, onPage, isProjectView, setData, go, setTheme, applyLayout, listKey, historyKey, scoringKey, loadPrefs, loadSettings, gotSettings, actionFor, comboOf, inField, runAction, gotNoteCheck } from "./lib/state.svelte";
   import Sidebar from "./components/Sidebar.svelte";
   import ListPane from "./components/ListPane.svelte";
   import DetailPane from "./components/DetailPane.svelte";
@@ -22,6 +22,7 @@
   window.board.onPrefs((p) => (ui.prefs = p));
   window.board.onSettings(gotSettings);
   window.board.onAction(runAction);
+  window.board.onNoteCheck(gotNoteCheck);
   window.keys.onChange((s) => (ui.shortcuts = s));
   loadPrefs();
   loadSettings();

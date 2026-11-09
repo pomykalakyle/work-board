@@ -5,6 +5,7 @@
   import Dot from "./Dot.svelte";
   import Cite from "./Cite.svelte";
   import RecentActivity from "./RecentActivity.svelte";
+  import TaskNotes from "./TaskNotes.svelte";
   let { t }: { t: ListTask } = $props();
 
   const r = $derived(rankedOf(t.key));
@@ -54,6 +55,7 @@
         </div>
       </section>
       {#if t.next}<section class="d-sec"><h3>Next step</h3>{@render lines(t.next)}</section>{/if}
+      <TaskNotes {t} />
       <section class={["why-box", { open: ui.whyOpen }]}>
         <button class="why-toggle" aria-expanded={ui.whyOpen} title="Show or hide the reasons (r)" onclick={toggleWhy}>
           <span class="chev">{@html CHEVRON}</span><span class="why-lbl">Why this ranking</span>
@@ -75,7 +77,8 @@
           <div class="txt">{t.status === "parked" ? "Parked: nothing to do for now." : t.status === "done" ? "Done " + (t.doneAt || "") : t.status}</div>
         </section>
       {/if}
-      {#if t.next}<section class="d-sec"><h3>{t.status === "blocked" ? "Then" : "Note"}</h3>{@render lines(t.next)}</section>{/if}
+      {#if t.next}<section class="d-sec"><h3>{t.status === "blocked" ? "Then" : "Next step"}</h3>{@render lines(t.next)}</section>{/if}
+      <TaskNotes {t} />
     {/if}
   </div>
   {#if hasRecent}<div class="d-right"><RecentActivity {t} /></div>{/if}

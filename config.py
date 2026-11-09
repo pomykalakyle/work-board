@@ -2,7 +2,8 @@
 
 Usage:
   python3 -I config.py get SECTION.KEY       print one setting, e.g. claude.model
-  python3 -I config.py prompt                print prompt.md filled in (reads NOW from the environment)
+  python3 -I config.py prompt                print prompt.md filled in (reads NOW, and FOCUS for a note's quick
+                                             check, task:KEY or project:KEY, from the environment)
   python3 -I config.py mcp                   print the --mcp-config JSON, or nothing without [slack]
   python3 -I config.py tools                 print the allowed tools, one per line
   python3 -I config.py sources               print the sources for the page's time stamp
@@ -173,12 +174,33 @@ def ranking():
         return re.sub(r"<!--.*?-->\s*", "", f.read(), flags=re.S).strip()
 
 
+def focus_text(scope):
+    """The prompt's opening for a quick check that saving a note starts (run.sh --note-check SCOPE,
+    SCOPE being task:KEY or project:KEY), or "" for a regular run."""
+    if not scope:
+        return ""
+    kind, _, key = scope.partition(":")
+    if kind not in ("task", "project") or not re.fullmatch(r"[A-Za-z0-9_.-]+", key):
+        raise ValueError(f"Not a note scope: {scope}")
+    which = (f"the task '{key}'" if kind == "task" else
+             f"the project '{key}', so re-check every open and blocked task with project_key '{key}'")
+    return ("This is a quick check, not a regular run. The user just changed their notes on " + which +
+            ", and the app is waiting to show them the result. Apply the notes (rules under \"The user's notes\" below),"
+            " reading the task's sources as far as you need to get it right. Skip the rest of the steps: don't look for"
+            " new asks, don't change other tasks (unless one must be merged with a task you're checking), and don't"
+            " write a standup draft or a 'today' note. Log history as usual. Report in one short line what changed,"
+            " or NO_UPDATE.")
+
+
 def prompt(c):
     first, _, _ = schedule(c)
-    kind = "the first run of the day" if datetime.datetime.now().hour == first else "a later run, not the first of the day"
+    focus = focus_text(os.environ.get("FOCUS", ""))
+    kind = ("a quick check started by a note" if focus else
+            "the first run of the day" if datetime.datetime.now().hour == first else "a later run, not the first of the day")
     with open(os.path.join(DIR, "prompt.md")) as f:
         t = f.read()
-    for k, v in {"NOW": os.environ["NOW"], "RUN_KIND": kind, "ABOUT": about(c), "PREFERENCES": preferences(), "SOURCES": sources(c), "RANKING": ranking(), "STANDUP": standup(c)}.items():
+    for k, v in {"NOW": os.environ["NOW"], "RUN_KIND": kind, "FOCUS": focus, "ABOUT": about(c), "PREFERENCES": preferences(),
+                 "SOURCES": sources(c), "RANKING": ranking(), "STANDUP": "" if focus else standup(c)}.items():
         t = t.replace("{{" + k + "}}", v)
     return t
 
@@ -258,8 +280,9 @@ def stamp_sources(c):
     return ", ".join(names[:-1]) + " and " + names[-1]
 
 
-# The kinds of history event. 'priority' (added 2026-10-30) is a rank, tier or score move.
-KIND_CHECK = "CHECK (kind IN ('added','update','blocked','unblocked','done','priority'))"
+# The kinds of history event. 'priority' (added 2026-10-30) is a rank, tier or score move;
+# 'note' (added 2026-11-09) is the user adding, editing or removing a note, written by notes.py only.
+KIND_CHECK = "CHECK (kind IN ('added','update','blocked','unblocked','done','priority','note'))"
 
 TASKS_SCHEMA = """CREATE TABLE IF NOT EXISTS {name} (id INTEGER PRIMARY KEY, task_key TEXT NOT NULL UNIQUE, title TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('open','blocked','parked','done')),
@@ -280,6 +303,9 @@ CREATE TABLE IF NOT EXISTS work_events (id INTEGER PRIMARY KEY, at TEXT NOT NULL
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE INDEX IF NOT EXISTS work_events_task ON work_events (task_key, at);
 CREATE TABLE IF NOT EXISTS work_standup (day TEXT PRIMARY KEY, text TEXT NOT NULL, updated_at TEXT);
+CREATE TABLE IF NOT EXISTS work_notes (id INTEGER PRIMARY KEY, task_key TEXT, project_key TEXT, text TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, removed_at TEXT,
+  CHECK ((task_key IS NULL) <> (project_key IS NULL)));
 """.replace("{kind_check}", KIND_CHECK)
 
 
@@ -303,33 +329,42 @@ def migrate_1_to_5(db):
 
 
 def migrate_event_kinds(db):
-    """SQLite can't change a CHECK in place, so rebuild work_events to allow the
-    'priority' kind (added 2026-10-30). Rows and ids are kept as they are."""
+    """SQLite can't change a CHECK in place, so rebuild work_events when its CHECK lacks a
+    newer kind ('priority', added 2026-10-30; 'note', added 2026-11-09). Rows and ids are kept."""
     sql = db.execute("SELECT sql FROM sqlite_master WHERE name = 'work_events'").fetchone()
-    if not sql or "kind" not in sql[0] or "'priority'" in sql[0]:
+    if not sql or "kind" not in sql[0] or "'note'" in sql[0]:
         return
-    shutil.copy(DB, DB + ".before-priority-kind")
-    cols = "id, at, task_key, text, created_at, kind"
+    shutil.copy(DB, DB + ".before-note-kind")
+    old = {r[1] for r in db.execute("PRAGMA table_info(work_events)")}
+    cols = ", ".join(c for c in ("id", "at", "task_key", "text", "created_at", "kind", "project_key") if c in old)
     db.execute(f"""CREATE TABLE work_events_new (id INTEGER PRIMARY KEY, at TEXT NOT NULL, task_key TEXT, text TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, kind TEXT NOT NULL DEFAULT 'update' {KIND_CHECK})""")
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, kind TEXT NOT NULL DEFAULT 'update' {KIND_CHECK}, project_key TEXT)""")
     db.execute(f"INSERT INTO work_events_new ({cols}) SELECT {cols} FROM work_events")
     db.execute("DROP TABLE work_events")  # drops its index too; SCHEMA recreates it
     db.execute("ALTER TABLE work_events_new RENAME TO work_events")
+
+
+def ensure_schema(db):
+    """Bring work.db's tables up to date. Used by init and by notes.py (the app's note writes)."""
+    migrate_1_to_5(db)
+    migrate_event_kinds(db)
+    db.executescript(SCHEMA)
+    cols = {r[1] for r in db.execute("PRAGMA table_info(work_tasks)")}
+    if "impact_reason" not in cols:  # added 2026-10-29
+        db.execute("ALTER TABLE work_tasks ADD COLUMN impact_reason TEXT")
+    ev_cols = {r[1] for r in db.execute("PRAGMA table_info(work_events)")}
+    if "kind" not in ev_cols:  # added 2026-10-29
+        db.execute("ALTER TABLE work_events ADD COLUMN kind TEXT NOT NULL DEFAULT 'update' " + KIND_CHECK)
+    # The project an event is about when it has no task: a change to a project's notes (added 2026-11-09).
+    if "project_key" not in ev_cols:
+        db.execute("ALTER TABLE work_events ADD COLUMN project_key TEXT")
 
 
 def init(c):
     """Create the tables if missing, then make work_projects match [[projects]]."""
     db = sqlite3.connect(DB)
     with db:
-        migrate_1_to_5(db)
-        migrate_event_kinds(db)
-        db.executescript(SCHEMA)
-        cols = {r[1] for r in db.execute("PRAGMA table_info(work_tasks)")}
-        if "impact_reason" not in cols:  # added 2026-10-29
-            db.execute("ALTER TABLE work_tasks ADD COLUMN impact_reason TEXT")
-        ev_cols = {r[1] for r in db.execute("PRAGMA table_info(work_events)")}
-        if "kind" not in ev_cols:  # added 2026-10-29
-            db.execute("ALTER TABLE work_events ADD COLUMN kind TEXT NOT NULL DEFAULT 'update' " + KIND_CHECK)
+        ensure_schema(db)
         keys = []
         for rank, p in enumerate(c.get("projects", []), 1):
             keys.append(p["key"])

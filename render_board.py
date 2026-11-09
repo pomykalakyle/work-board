@@ -281,7 +281,7 @@ def link_label(url):
     return "Open link"
 
 
-def board_data(tasks, projects, stamp, events=(), standup=None):
+def board_data(tasks, projects, stamp, events=(), standup=None, notes=()):
     """The ranked board as plain data, for the Work Board app (board.json)."""
     by_key = {p["project_key"]: p for p in projects}
     open_tasks = sorted((t for t in tasks if t["status"] == "open"), key=rank_key)
@@ -340,8 +340,13 @@ def board_data(tasks, projects, stamp, events=(), standup=None):
         "ranked": ranked_rows,
         "blocked": [plain(t) for t in tasks if t["status"] == "blocked"],
         "projects": project_rows,
-        "events": [{"at": e["at"], "key": e.get("task_key"), "kind": e.get("kind") or "update", "title": e.get("title") or "",
+        # An event about a project and no task is a change to that project's notes.
+        "events": [{"at": e["at"], "key": e.get("task_key"), "kind": e.get("kind") or "update",
+                    "title": e.get("title") or ("Project notes" if not e.get("task_key") and e.get("project_key") else ""),
                     "taskStatus": e.get("status") or "", "project": e.get("project_key"), "text": e["text"]} for e in events],
+        # The user's notes in force, newest first: on a task (task set) or a whole project (project set).
+        "notes": [{"id": n["id"], "task": n.get("task_key"), "project": n.get("project_key"), "text": n["text"],
+                   "createdAt": n.get("created_at") or "", "updatedAt": n.get("updated_at") or ""} for n in notes],
         # None when [standup] is off; with it on, the newest draft (empty before the first one is written).
         "standup": standup,
     }
@@ -467,7 +472,8 @@ def main():
                 rows = rows_of(flags[flags.index("--standup") + 1])
                 standup = ({"day": rows[0]["day"], "text": rows[0]["text"], "updatedAt": rows[0]["updated_at"] or ""}
                            if rows else {"day": "", "text": "", "updatedAt": ""})
-            json.dump(board_data(tasks, projects, stamp, events, standup), f, indent=1)
+            notes = rows_of(flags[flags.index("--notes") + 1]) if "--notes" in flags else []
+            json.dump(board_data(tasks, projects, stamp, events, standup, notes), f, indent=1)
         os.chmod(tmp, 0o644)
         os.replace(tmp, target)
     if "--out" in flags:

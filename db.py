@@ -11,7 +11,8 @@ query and export print or write {"columns": [...], "rows": [[...], ...]}, the sh
 render_board.py reads. exec runs one statement and prints how many rows it changed.
 SQLite's authorizer enforces what exec may do, whatever the SQL text says: insert or
 update tasks, add history events (never change old ones), and write the standup draft.
-Projects come from config.toml (config.py init), so they can't be changed here.
+Projects come from config.toml (config.py init) and the user's notes from the app (notes.py),
+so neither can be changed here.
 """
 import json
 import os

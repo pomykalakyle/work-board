@@ -78,8 +78,9 @@ const shortcutState = (): ShortcutState => ({
 });
 
 // Scopes that can see the same key press: global everywhere, moving in every list, but a task
-// list and History never at once.
-const overlaps = (a: string, b: string) => a === b || a === "global" || b === "global" || a === "move" || b === "move";
+// list and History never at once. A note's text field sees only its own keys and ⌘ or ⌃ global ones.
+const overlaps = (a: string, b: string) =>
+  a === b || a === "global" || b === "global" || ((a === "move" || b === "move") && a !== "note" && b !== "note");
 
 function saveKeys(bindings: Record<string, string[]>): ShortcutState {
   const next: Record<string, string[]> = {};
@@ -283,12 +284,66 @@ function watch() {
   setInterval(pushRefreshing, 3000);
 }
 
-function runRefresh() {
-  if (refreshing()) return;
+const runEnv = (): NodeJS.ProcessEnv => {
   const env: NodeJS.ProcessEnv = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
-  spawn("/bin/bash", [path.join(DIR, "run.sh")], { detached: true, stdio: "ignore", env }).unref();
+  return env;
+};
+
+function runRefresh() {
+  if (refreshing()) return;
+  spawn("/bin/bash", [path.join(DIR, "run.sh")], { detached: true, stdio: "ignore", env: runEnv() }).unref();
   setTimeout(pushRefreshing, 500);
+}
+
+// ---------- Notes ----------
+// The user's notes on a task or project live in work.db; notes.py writes them (the refresh agent
+// can't). After a change, run.sh --render rebuilds board.json so the note shows at once, and
+// run.sh --note-check starts a quick check of just that task or project, which waits for a
+// running check rather than skipping. Each check gets an id, so the window can tell an older
+// check's result from the one it's waiting for.
+const SCOPE = /^(task|project):[A-Za-z0-9_.-]+$/;
+let noteCheckSeq = 0;
+
+function notesPy(args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile("python3", ["-I", path.join(DIR, "notes.py"), ...args], { cwd: DIR, env: { ...runEnv(), PATH: RUN_PATH }, timeout: 30000 }, (err, stdout, stderr) => {
+      if (err) reject(new Error((stderr || stdout).trim() || err.message));
+      else resolve(stdout);
+    });
+  });
+}
+
+// Rebuild board.json from work.db and send it to the window right away (not after the file watcher's delay).
+function renderBoard(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile("/bin/bash", [path.join(DIR, "run.sh"), "--render"], { cwd: DIR, env: runEnv(), timeout: 60000 }, (err) => {
+      if (err) reject(new Error("The note is saved, but the board couldn't be redrawn. See the logs."));
+      else { pushBoard(); resolve(); }
+    });
+  });
+}
+
+async function changeNote(args: string[]): Promise<number | null> {
+  const out = await notesPy(args);
+  await renderBoard();
+  try { return JSON.parse(out).id ?? null; } catch { return null; }
+}
+
+function startNoteCheck(scope: string): number {
+  if (!SCOPE.test(scope)) throw new Error(`Not a note scope: ${scope}`);
+  const id = ++noteCheckSeq;
+  const child = spawn("/bin/bash", [path.join(DIR, "run.sh"), "--note-check", scope], { detached: true, stdio: "ignore", env: runEnv() });
+  child.on("error", () => win?.webContents.send("note-check", { scope, id, ok: false }));
+  child.on("exit", (code) => {
+    // run.sh has rewritten board.json by now: send it before the result, so the window compares against the new board.
+    pushBoard();
+    pushRefreshing();
+    win?.webContents.send("note-check", { scope, id, ok: code === 0 });
+  });
+  child.unref();
+  setTimeout(pushRefreshing, 500);
+  return id;
 }
 
 // Small minimum so AeroSpace can tile it to a half or a third of the screen; the UI adapts.
@@ -464,6 +519,14 @@ ipcMain.on("theme:get", (e) => { e.returnValue = themeState(); });
 ipcMain.handle("theme:set", (_e, id: string) => setTheme(id));
 ipcMain.handle("theme:step", (_e, by: number) => stepTheme(by === -1 ? -1 : 1));
 ipcMain.handle("refresh", () => runRefresh());
+ipcMain.handle("notes:add", (_e, scope: string, text: string) => {
+  if (!SCOPE.test(scope)) throw new Error(`Not a note scope: ${scope}`);
+  const [kind, key] = scope.split(":");
+  return changeNote(["add", kind, key, String(text)]);
+});
+ipcMain.handle("notes:edit", (_e, id: number, text: string) => changeNote(["edit", String(Math.trunc(Number(id))), String(text)]).then(() => {}));
+ipcMain.handle("notes:remove", (_e, id: number) => changeNote(["remove", String(Math.trunc(Number(id)))]).then(() => {}));
+ipcMain.handle("notes:check", (_e, scope: string) => startNoteCheck(scope));
 ipcMain.handle("prefs:get", () => readPrefs());
 ipcMain.handle("prefs:set", (_e, p: Prefs) => writePrefs(p));
 ipcMain.handle("settings:get", () => readSettings());
