@@ -19,6 +19,5 @@
   <div class="d-proj"><Dot color={p.color} />{p.name}</div>
 </div>
 <section class="d-sec nt-page">
-  <p class="nt-about">Notes here apply to every task in this project, including new ones.</p>
   <NotesBody {scope} {notes} {what} label="New note on this project" />
 </section>

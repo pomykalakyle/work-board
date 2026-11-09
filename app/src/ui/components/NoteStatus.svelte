@@ -11,7 +11,7 @@
     {#if c.phase === "saving"}<span class="nt-spin" aria-hidden="true"></span>Saving note…
     {:else if c.phase === "checking"}<span class="nt-spin" aria-hidden="true"></span>Note saved · Checking {what}…
     {:else if c.phase === "done"}{c.text}
-    {:else if c.phase === "saveError"}Couldn't save the note{c.text ? `: ${c.text}` : ""}. Your text is still there to try again.
+    {:else if c.phase === "saveError"}Couldn't save the note{c.text ? `: ${c.text}` : ""}
     {:else}Note saved · Check failed{c.text ? `: ${c.text}` : ""}<button class="more nt-again" onclick={() => checkScope(scope)}>Check again</button>{/if}
   </div>
 {/if}

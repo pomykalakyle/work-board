@@ -33,8 +33,7 @@
   bind:value={() => draft, (v) => (v ? drafts.set(scope, v) : drafts.delete(scope))} onkeydown={key}></textarea>
 {#if draft.trim()}
   <div class="nt-btns">
-    <button class="pf-btn primary" disabled={busy} onclick={save}>Save & check</button>
-    <span class="nt-cost">Checks {what} again · about a minute of Claude</span>
+    <button class="pf-btn primary" disabled={busy} title={`Saves the note and checks ${what} again (about a minute)`} onclick={save}>Save & check</button>
   </div>
 {/if}
 <NoteStatus {scope} {what} />
