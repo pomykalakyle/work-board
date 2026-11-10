@@ -1,14 +1,20 @@
 <script lang="ts">
   // The task panel's "Recent activity": the newest five, then "Show 5 older"
   // grows the list in place. How far each task is opened lasts until the app quits.
-  import { eventsOf, recentShown, openHistoryFor } from "../lib/state.svelte";
+  import { eventsOf, recentShown, openHistoryFor, noteChecks } from "../lib/state.svelte";
   import { parseAt, ymd, isToday, dayHeading } from "../lib/text";
   import Events from "./Events.svelte";
   let { t }: { t: ListTask } = $props();
 
   const RECENT = 5;
   const evs = $derived(eventsOf(t.key));
-  const n = $derived(Math.min(evs.length, recentShown.get(t.key) || RECENT));
+  // A note saved under one of these rows logs a new row on top, which would push it past the shown
+  // ones and hide its status: keep that row shown while its status is up.
+  const pinned = $derived.by(() => {
+    const origin = noteChecks.get(`task:${t.key}`)?.origin;
+    return origin?.startsWith("event:") ? evs.findIndex((e) => `event:${e.id}` === origin) + 1 : 0;
+  });
+  const n = $derived(Math.min(evs.length, Math.max(recentShown.get(t.key) || RECENT, pinned)));
   const shown = $derived(evs.slice(0, n));
   const left = $derived(evs.length - n);
   const more = $derived(Math.min(RECENT, left));

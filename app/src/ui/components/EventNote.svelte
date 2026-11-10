@@ -14,11 +14,14 @@
   const draft = $derived(drafts.get(at) ?? "");
   const busy = $derived(noteChecks.get(scope)?.phase === "saving");
 
-  // Back to the row's note button, which opened the field (Esc or Cancel).
+  let wrap = $state<HTMLElement>();
+  // Back to the row's note button, which opened the field (Esc or Cancel). It's looked up in this row,
+  // since the same event can also be on the page in a hidden copy (History's narrow inline timeline).
   async function close() {
+    const row = wrap?.parentElement;
     eventEditors.delete(e.id);
     await tick();
-    document.querySelector<HTMLElement>(`[data-ev-note="${e.id}"]`)?.focus();
+    row?.querySelector<HTMLElement>(`[data-ev-note="${e.id}"]`)?.focus();
   }
   async function save() {
     if (busy || !draft.trim()) return;
@@ -36,7 +39,7 @@
 {#if note}
   <div class="ev-note nt-item"><NoteItem n={note} {scope} origin={at} /></div>
 {:else if open}
-  <div class="ev-note">
+  <div class="ev-note" bind:this={wrap}>
     <textarea class="pf-in nt-in" rows="1" aria-label="Note on this event" {@attach focus}
       bind:value={() => draft, (v) => (v ? drafts.set(at, v) : drafts.delete(at))} onkeydown={key}></textarea>
     <div class="nt-btns">
