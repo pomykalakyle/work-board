@@ -46,7 +46,7 @@
 {/if}
 {#if notes.length}
   <ul class="nt-list">
-    {#each notes.slice(0, n) as note (note.id)}<li class="nt-item"><NoteItem n={note} {scope} /></li>{/each}
+    {#each notes.slice(0, n) as note (note.id)}<li class="nt-item"><NoteItem n={note} {scope} compact={!!note.event} /></li>{/each}
   </ul>
   {#if notes.length > NOTES_FIRST}
     <div class="ev-ctl">

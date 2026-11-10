@@ -502,6 +502,12 @@ export function setData(data: Board | null) {
 export const taskNotes = (key: string) => (ui.data?.notes || []).filter((n) => n.task === key);
 export const projectNotes = (key: string) => (ui.data?.notes || []).filter((n) => n.project === key);
 export const noteById = (id: number) => (ui.data?.notes || []).find((n) => n.id === id) ?? null;
+// The note in force on one history row, if any (a row takes one at a time).
+export const eventNote = (id: number) => (ui.data?.notes || []).find((n) => n.event === id) ?? null;
+// Whether a history row can take a note: a task's own news that the board still has, not a note change.
+export const canNoteEvent = (e: BoardEvent) => !!e.key && e.kind !== "note" && typeof e.id === "number" && !!taskByKey(e.key);
+// The history rows whose note field is open (until the app quits).
+export const eventEditors = new SvelteSet<number>();
 // The task's real project ("No project" can't have notes).
 export const notesProjectOf = (taskKey: string) => {
   const p = projectOfKey(taskKey);
@@ -528,6 +534,7 @@ export interface NoteCheck {
   id: number;        // the check's id, so an older check's result can't stand in for a newer one
   text: string;      // the result ("Re-reviewed · Next step changed") or the error
   before?: Snap;     // the board before the check, to say what it changed
+  origin?: string;   // where the change was made ("event:ID" under a history row; unset in the notes section), where its status shows
 }
 export const noteChecks = new SvelteMap<string, NoteCheck>();
 
@@ -578,27 +585,28 @@ function describe(scope: string, before: Snap): string {
 // Start the quick check (or check again after a failure).
 export async function checkScope(scope: NoteScope) {
   const before = snapshot(scope);
-  noteChecks.set(scope, { phase: "checking", id: -1, text: "", before });
+  const origin = noteChecks.get(scope)?.origin;
+  noteChecks.set(scope, { phase: "checking", id: -1, text: "", before, origin });
   try {
     const id = await window.board.checkNotes(scope);
     // A result can't arrive before the id: a check takes at least seconds.
     const c = noteChecks.get(scope);
     if (c && c.phase === "checking" && c.id === -1) noteChecks.set(scope, { ...c, id });
   } catch (e) {
-    noteChecks.set(scope, { phase: "checkError", id: 0, text: ipcError(e) });
+    noteChecks.set(scope, { phase: "checkError", id: 0, text: ipcError(e), origin });
   }
 }
 
 // Save a change to a note; checking is a separate button. False (with the error showing) when it didn't save.
-async function change(scope: NoteScope, write: () => Promise<unknown>): Promise<boolean> {
-  noteChecks.set(scope, { phase: "saving", id: 0, text: "" });
+async function change(scope: NoteScope, write: () => Promise<unknown>, origin?: string): Promise<boolean> {
+  noteChecks.set(scope, { phase: "saving", id: 0, text: "", origin });
   try {
     await write();
   } catch (e) {
-    noteChecks.set(scope, { phase: "saveError", id: 0, text: ipcError(e) });
+    noteChecks.set(scope, { phase: "saveError", id: 0, text: ipcError(e), origin });
     return false;
   }
-  noteChecks.set(scope, { phase: "saved", id: 0, text: "" });
+  noteChecks.set(scope, { phase: "saved", id: 0, text: "", origin });
   return true;
 }
 
@@ -608,14 +616,22 @@ export async function addNote(scope: NoteScope, text: string): Promise<boolean> 
   if (ok && drafts.get(scope) === text) drafts.delete(scope);
   return ok;
 }
-export const editNote = (scope: NoteScope, id: number, text: string) => change(scope, () => window.board.editNote(id, text.trim()));
-export const removeNote = (scope: NoteScope, id: number) => change(scope, () => window.board.removeNote(id));
+// A note on one history row: saved with its task, its status shown under that row. Its draft is kept per row.
+export async function addEventNote(e: BoardEvent, text: string): Promise<boolean> {
+  const at = `event:${e.id}` as const;
+  const ok = await change(`task:${e.key}`, () => window.board.addNote(at, text.trim()), at);
+  if (ok && drafts.get(at) === text) drafts.delete(at);
+  return ok;
+}
+export const editNote = (scope: NoteScope, id: number, text: string, origin?: string) => change(scope, () => window.board.editNote(id, text.trim()), origin);
+export const removeNote = (scope: NoteScope, id: number, origin?: string) => change(scope, () => window.board.removeNote(id), origin);
 
 // From the main process: a quick check ended. board.json was sent just before, so the board is current.
 export function gotNoteCheck(r: NoteCheckResult) {
   const c = noteChecks.get(r.scope);
   if (!c || c.phase !== "checking" || c.id !== r.id) return; // an older check; a newer one is still running
-  noteChecks.set(r.scope, r.ok ? { phase: "done", id: r.id, text: describe(r.scope, c.before ?? {}) } : { phase: "checkError", id: r.id, text: "" });
+  noteChecks.set(r.scope, r.ok ? { phase: "done", id: r.id, text: describe(r.scope, c.before ?? {}), origin: c.origin }
+    : { phase: "checkError", id: r.id, text: "", origin: c.origin });
 }
 
 export function toggleNotes() {

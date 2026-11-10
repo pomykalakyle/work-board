@@ -69,6 +69,7 @@ interface Project {
 }
 
 interface BoardEvent {
+  id: number;
   at: string;
   key: string | null;
   // priority: a rank, tier or score move; note: the user added, edited or removed a note (notes.py)
@@ -123,9 +124,15 @@ interface Note {
   text: string;
   createdAt: string;
   updatedAt: string;
+  // A task's note written on one of its history rows: that row's id, time and text (null and "" otherwise).
+  event?: number | null;
+  eventAt?: string;
+  eventText?: string;
 }
 // "task:KEY" or "project:KEY": what a note is on, and what its quick check re-checks.
 type NoteScope = `task:${string}` | `project:${string}`;
+// Where a new note goes: a task, a project, or one history row of a task ("event:ID", checked with its task).
+type NoteTarget = NoteScope | `event:${number}`;
 // A quick check finished: ok is false when it failed (the note itself is saved either way).
 interface NoteCheckResult {
   scope: NoteScope;
@@ -218,7 +225,7 @@ interface BoardApi {
   copy(text: string, html: string): Promise<void>;
   onAction(cb: (id: string) => void): void;
   // Notes: each change rebuilds board.json (and sends it) before it resolves. addNote resolves to the new note's id.
-  addNote(scope: NoteScope, text: string): Promise<number | null>;
+  addNote(scope: NoteTarget, text: string): Promise<number | null>;
   editNote(id: number, text: string): Promise<void>;
   removeNote(id: number): Promise<void>;
   // Starts the quick check of a task or project and resolves to its id; onNoteCheck reports when it ends.

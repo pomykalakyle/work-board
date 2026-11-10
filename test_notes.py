@@ -65,6 +65,25 @@ class NotesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             notes.edit(self.db, n, "y")  # a removed note can't change
 
+    def test_note_on_an_event(self):
+        """A note on a history row belongs to that row's task, and a row takes one note at a time."""
+        with self.db:
+            ev = self.db.execute("INSERT INTO work_events (at, task_key, kind, text) VALUES ('2026-11-10 08:00', 't', 'update', 'CI failed')").lastrowid
+            other = self.db.execute("INSERT INTO work_events (at, task_key, kind, text) VALUES ('2026-11-10 08:01', NULL, 'update', 'News')").lastrowid
+            n = notes.add(self.db, "event", str(ev), "Runner was flaky.")
+        self.assertEqual(self.db.execute("SELECT task_key, project_key, event_id FROM work_notes WHERE id = ?", (n,)).fetchone(), ("t", None, ev))
+        self.assertEqual(self.events()[-1], ("t", None, "note", "Added: Runner was flaky."))
+        for key in [str(ev), str(other), "999", "x"]:  # already has a note, no task, missing, not an id
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                notes.add(self.db, "event", key, "Again")
+        note_ev = self.db.execute("SELECT id FROM work_events WHERE kind = 'note'").fetchone()[0]
+        with self.assertRaises(ValueError):
+            notes.add(self.db, "event", str(note_ev), "A note on a note")
+        # Once removed, the event can take a new one.
+        with self.db:
+            notes.remove(self.db, n)
+            notes.add(self.db, "event", str(ev), "Fixed now.")
+
     def test_long_note_is_quoted_short(self):
         with self.db:
             notes.add(self.db, "task", "t", "word " * 100)
@@ -111,6 +130,20 @@ class NotesTests(unittest.TestCase):
 
 
 class MigrationTests(unittest.TestCase):
+    def test_old_notes_table_gains_event_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "work.db")
+            db = sqlite3.connect(path)
+            db.execute("""CREATE TABLE work_notes (id INTEGER PRIMARY KEY, task_key TEXT, project_key TEXT, text TEXT NOT NULL,
+              created_at TEXT NOT NULL, updated_at TEXT NOT NULL, removed_at TEXT,
+              CHECK ((task_key IS NULL) <> (project_key IS NULL)))""")
+            db.execute("INSERT INTO work_notes (task_key, text, created_at, updated_at) VALUES ('t', 'old', 'a', 'a')")
+            db.commit()
+            with patch.object(config, "DB", path), db:
+                config.ensure_schema(db)
+            self.assertEqual(db.execute("SELECT task_key, text, event_id FROM work_notes").fetchall(), [("t", "old", None)])
+            db.close()
+
     def test_old_event_table_gains_note_kind_and_project(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "work.db")

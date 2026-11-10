@@ -5,13 +5,22 @@
   import type { Attachment } from "svelte/attachments";
   import { tick } from "svelte";
   import { editNote, removeNote, noteChecks, isAction } from "../lib/state.svelte";
-  import { parseAt, whenShort } from "../lib/text";
-  let { n, scope }: { n: Note; scope: NoteScope } = $props();
+  import { parseAt, whenShort, clock, MON, splitReason } from "../lib/text";
+  // origin: set under a history row, so a change's status shows there. compact: an event's note listed in
+  // the notes section, one line plus the row it's on (the full note sits under that row).
+  let { n, scope, origin, compact = false }: { n: Note; scope: NoteScope; origin?: string; compact?: boolean } = $props();
 
   let mode = $state<"view" | "edit" | "remove">("view");
   let draft = $state("");
   let full = $state(false);
   let long = $state(false);
+  let longSrc = $state(false);
+  // The history row a compact note is on: "Nov 10, 8:00am · Offline tests still fail in CI".
+  const src = $derived.by(() => {
+    if (!compact || !n.eventText) return "";
+    const d = parseAt(n.eventAt);
+    return (d ? `${MON[d.getMonth()]} ${d.getDate()}, ${clock(d)} · ` : "") + splitReason(n.eventText).sentence;
+  });
   const busy = $derived(noteChecks.get(scope)?.phase === "saving");
   const when = $derived.by(() => {
     const d = parseAt(n.updatedAt);
@@ -21,9 +30,9 @@
   });
 
   // Whether the text runs past its two lines, so "Show full note" only shows when it does something.
-  const measure = (text: string): Attachment<HTMLElement> => (el) => {
+  const measure = (text: string, set: (v: boolean) => void): Attachment<HTMLElement> => (el) => {
     void text; // re-measure when the text changes
-    const check = () => (long = el.scrollHeight > el.clientHeight + 1);
+    const check = () => set(el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1);
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => ro.disconnect();
@@ -37,11 +46,11 @@
   }
   async function saveEdit() {
     if (busy || !draft.trim() || draft.trim() === n.text) return;
-    if (await editNote(scope, n.id, draft)) mode = "view";
+    if (await editNote(scope, n.id, draft, origin)) mode = "view";
   }
   async function remove() {
     if (busy) return;
-    if (await removeNote(scope, n.id)) mode = "view";
+    if (await removeNote(scope, n.id, origin)) mode = "view";
   }
   function editKey(e: KeyboardEvent) {
     if (e.isComposing) return;
@@ -57,7 +66,8 @@
     <button class="pf-btn" onclick={() => (mode = "view")}>Cancel</button>
   </div>
 {:else}
-  <div class={["nt-text", { clamp: !full }]} {@attach measure(n.text)}>{n.text}</div>
+  <div class={["nt-text", { clamp: !full, one: compact }]} {@attach measure(n.text, (v) => (long = v))}>{n.text}</div>
+  {#if src}<div class={["nt-src", { one: !full }]} title={full ? undefined : src} {@attach measure(src, (v) => (longSrc = v))}>On {src}</div>{/if}
   {#if mode === "remove"}
     <div class="nt-btns">
       <span class="nt-ask">Stop applying this note?</span>
@@ -67,7 +77,7 @@
   {:else}
     <div class="nt-meta">
       <span class="nt-when" title={n.updatedAt}>{when}</span>
-      {#if long || full}<button class="more" onclick={() => (full = !full)}>{full ? "Show less" : "Show full note"}</button>{/if}
+      {#if long || longSrc || full}<button class="more" onclick={() => (full = !full)}>{full ? "Show less" : "Show full note"}</button>{/if}
       <span class="nt-acts">
         <button class="pf-btn" onclick={startEdit}>Edit</button>
         <button class="pf-btn" onclick={() => (mode = "remove")}>Remove</button>

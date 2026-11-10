@@ -74,6 +74,8 @@ That server's README covers how to get a token. Leave its posting tool off (it i
 
 When the board gets a task wrong, write a note on it. Open "Your notes" on the task's panel (or press c), type the correction, for example "Sam has taken this over; I'm not replying", and press Enter to save it. Re-review then has Claude review just that task again, about a minute, and the panel says what changed; otherwise the next hourly check picks it up. Every later check follows the note until you remove it, and cites it as "your note" where it changed something. A project's header has the same for notes that apply to all of its tasks, new ones included. Notes and their edits show in the task's history.
 
+A note can also go on one line of a task's history, when it's one piece of evidence the board weighed wrong: click the speech bubble after the line's time and write, for example, "Just curious, nothing to do" under a question someone asked. The note shows under that line and in the task's notes, and checks read it with the line it's on when they judge how urgent and important the task is.
+
 If you disagree with a score, ask a coding agent in this folder to pin it, for example "pin api-docs urgency 4". The hourly run never changes a pinned value.
 
 ## Cost

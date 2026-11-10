@@ -329,10 +329,21 @@ ul.evs { list-style: none; margin: 0; padding: 0; }
 .nt-list .nt-item + .nt-item { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .nt-text { font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .nt-text.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.nt-text.clamp.one { -webkit-line-clamp: 1; }
+/* An event's note listed in the notes section: the history row it's on, one dim line until opened. */
+.nt-src { margin-top: 1px; font-size: 12px; line-height: 1.45; color: var(--mut); overflow-wrap: anywhere; }
+.nt-src.one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A history row's note button, after its time, and its note or field under the row. */
+.ev-nb { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 18px; margin-left: 3px; padding: 0; vertical-align: -4px;
+  border: 0; border-radius: 4px; background: none; color: var(--mut); cursor: pointer; }
+.ev-nb svg { width: 14px; height: 14px; }
+.ev-nb:hover, .ev-nb:focus-visible, .ev-nb.on { color: var(--fg); background: color-mix(in srgb, var(--fg) 9%, transparent); }
+.ev-note { margin: 6px 0 2px; padding-left: 10px; border-left: 2px solid color-mix(in srgb, var(--fg) 18%, transparent); color: var(--fg); }
+.ev-note .nt-meta { margin-top: 0; }
 /* Edit and Remove show on hover or keyboard focus; their space is kept, so nothing moves when they do. */
 .nt-meta { display: flex; align-items: center; gap: 12px; min-height: 24px; margin-top: 2px; font-size: 12px; color: var(--mut); }
 .nt-meta .more { margin: 0; }
-.nt-acts { display: flex; gap: 4px; margin-left: auto; opacity: 0; }
+.nt-acts { display: flex; gap: 4px; opacity: 0; }
 .nt-item:hover .nt-acts, .nt-item:focus-within .nt-acts { opacity: 1; }
 .nt-acts .pf-btn { padding: 1px 8px; }
 .nt-k { color: var(--mut); }

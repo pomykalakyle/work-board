@@ -3,8 +3,13 @@
   // check), checking, what the check changed, or what failed. It sits outside the notes' disclosure,
   // so it shows with the notes closed too.
   import { noteChecks, checkScope } from "../lib/state.svelte";
-  let { scope, what }: { scope: NoteScope; what: string } = $props();
-  const c = $derived(noteChecks.get(scope));
+  // origin: where this status sits ("event:ID" under a history row, unset in the notes section). A change
+  // shows its status only where it was made, so it doesn't repeat in both places.
+  let { scope, what, origin }: { scope: NoteScope; what: string; origin?: string } = $props();
+  const c = $derived.by(() => {
+    const x = noteChecks.get(scope);
+    return x && x.origin === origin ? x : null;
+  });
 </script>
 
 {#if c}

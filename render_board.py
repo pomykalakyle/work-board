@@ -5,7 +5,7 @@ Usage:
 
 --json-out also writes the ranked board as data for the Work Board app.
 --events adds the history (newest first) to that data, for the task panel, the History page and project activity:
-  SELECT e.at, e.task_key, e.kind, e.text, t.title, t.status, t.project_key FROM work_events e
+  SELECT e.id, e.at, e.task_key, e.kind, e.text, t.title, t.status, t.project_key FROM work_events e
   LEFT JOIN work_tasks t ON t.task_key = e.task_key ORDER BY e.at DESC, e.id DESC
 
 With --out the page is written atomically (temp file, then rename) and made
@@ -341,12 +341,15 @@ def board_data(tasks, projects, stamp, events=(), standup=None, notes=()):
         "blocked": [plain(t) for t in tasks if t["status"] == "blocked"],
         "projects": project_rows,
         # An event about a project and no task is a change to that project's notes.
-        "events": [{"at": e["at"], "key": e.get("task_key"), "kind": e.get("kind") or "update",
+        "events": [{"id": e.get("id"), "at": e["at"], "key": e.get("task_key"), "kind": e.get("kind") or "update",
                     "title": e.get("title") or ("Project notes" if not e.get("task_key") and e.get("project_key") else ""),
                     "taskStatus": e.get("status") or "", "project": e.get("project_key"), "text": e["text"]} for e in events],
         # The user's notes in force, newest first: on a task (task set) or a whole project (project set).
         "notes": [{"id": n["id"], "task": n.get("task_key"), "project": n.get("project_key"), "text": n["text"],
-                   "createdAt": n.get("created_at") or "", "updatedAt": n.get("updated_at") or ""} for n in notes],
+                   "createdAt": n.get("created_at") or "", "updatedAt": n.get("updated_at") or "",
+                   # On a task's note written on one of its history rows: that row's id, time and text.
+                   "event": n.get("event_id"), "eventAt": n.get("event_at") or "", "eventText": n.get("event_text") or ""}
+                  for n in notes],
         # None when [standup] is off; with it on, the newest draft (empty before the first one is written).
         "standup": standup,
     }

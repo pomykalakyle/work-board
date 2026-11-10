@@ -315,7 +315,7 @@ CREATE TABLE IF NOT EXISTS work_events (id INTEGER PRIMARY KEY, at TEXT NOT NULL
 CREATE INDEX IF NOT EXISTS work_events_task ON work_events (task_key, at);
 CREATE TABLE IF NOT EXISTS work_standup (day TEXT PRIMARY KEY, text TEXT NOT NULL, updated_at TEXT);
 CREATE TABLE IF NOT EXISTS work_notes (id INTEGER PRIMARY KEY, task_key TEXT, project_key TEXT, text TEXT NOT NULL,
-  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, removed_at TEXT,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, removed_at TEXT, event_id INTEGER,
   CHECK ((task_key IS NULL) <> (project_key IS NULL)));
 """.replace("{kind_check}", KIND_CHECK)
 
@@ -369,6 +369,9 @@ def ensure_schema(db):
     # The project an event is about when it has no task: a change to a project's notes (added 2026-11-09).
     if "project_key" not in ev_cols:
         db.execute("ALTER TABLE work_events ADD COLUMN project_key TEXT")
+    # The history row a task's note is about, when the user wrote it on an event (added 2026-11-10).
+    if "event_id" not in {r[1] for r in db.execute("PRAGMA table_info(work_notes)")}:
+        db.execute("ALTER TABLE work_notes ADD COLUMN event_id INTEGER")
 
 
 def init(c):

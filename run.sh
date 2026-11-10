@@ -72,8 +72,9 @@ render_board_locked() {
   python3 -I db.py export "SELECT task_key, title, status, tier, tier_reason, impact, urgency, effort, impact_reason, urgency_reason, pinned, next_step, blocked_on, link, done_at, project_key, source FROM work_tasks" "$TMP/tasks.json"
   python3 -I db.py export "SELECT project_key, name, priority, stage, done_when, color, rank FROM work_projects WHERE status = 'active' ORDER BY rank" "$TMP/projects.json"
   # An event about a project rather than a task (a change to its notes) carries its own project_key.
-  python3 -I db.py export "SELECT e.at, e.task_key, e.kind, e.text, t.title, t.status, COALESCE(t.project_key, e.project_key) AS project_key FROM work_events e LEFT JOIN work_tasks t ON t.task_key = e.task_key ORDER BY e.at DESC, e.id DESC LIMIT 2000" "$TMP/events.json"
-  python3 -I db.py export "SELECT id, task_key, project_key, text, created_at, updated_at FROM work_notes WHERE removed_at IS NULL ORDER BY created_at DESC, id DESC" "$TMP/notes.json"
+  python3 -I db.py export "SELECT e.id, e.at, e.task_key, e.kind, e.text, t.title, t.status, COALESCE(t.project_key, e.project_key) AS project_key FROM work_events e LEFT JOIN work_tasks t ON t.task_key = e.task_key ORDER BY e.at DESC, e.id DESC LIMIT 2000" "$TMP/events.json"
+  # A note on an event carries that event's time and text, so it reads right even once the event is past the 2000 above.
+  python3 -I db.py export "SELECT n.id, n.task_key, n.project_key, n.text, n.created_at, n.updated_at, n.event_id, e.at AS event_at, e.text AS event_text FROM work_notes n LEFT JOIN work_events e ON e.id = n.event_id WHERE n.removed_at IS NULL ORDER BY n.created_at DESC, n.id DESC" "$TMP/notes.json"
   # The newest standup draft, when [standup] is on (the app shows a Standup page only then).
   local standup_args=()
   if [ "$(python3 -I config.py standup-on)" = 1 ]; then

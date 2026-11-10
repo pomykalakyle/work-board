@@ -303,6 +303,8 @@ function runRefresh() {
 // running check rather than skipping. Each check gets an id, so the window can tell an older
 // check's result from the one it's waiting for.
 const SCOPE = /^(task|project):[A-Za-z0-9_.-]+$/;
+// What a new note can be on: a check's scopes, or one history row of a task ("event:ID").
+const TARGET = /^((task|project):[A-Za-z0-9_.-]+|event:\d+)$/;
 let noteCheckSeq = 0;
 
 function notesPy(args: string[]): Promise<string> {
@@ -521,7 +523,7 @@ ipcMain.handle("theme:set", (_e, id: string) => setTheme(id));
 ipcMain.handle("theme:step", (_e, by: number) => stepTheme(by === -1 ? -1 : 1));
 ipcMain.handle("refresh", () => runRefresh());
 ipcMain.handle("notes:add", (_e, scope: string, text: string) => {
-  if (!SCOPE.test(scope)) throw new Error(`Not a note scope: ${scope}`);
+  if (!TARGET.test(scope)) throw new Error(`Not a note scope: ${scope}`);
   const [kind, key] = scope.split(":");
   return changeNote(["add", kind, key, String(text)]);
 });

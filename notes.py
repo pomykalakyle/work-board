@@ -2,6 +2,7 @@
 
 Usage (the app runs these; the refresh agent can't, so only the user writes notes):
   python3 -I notes.py add task|project KEY TEXT    prints {"id": N}
+  python3 -I notes.py add event EVENT_ID TEXT      a note on one history row, kept with that row's task
   python3 -I notes.py edit ID TEXT
   python3 -I notes.py remove ID
 
@@ -49,6 +50,7 @@ def log(db, task_key, project_key, text):
 
 def add(db, kind, key, text):
     text = clean(text)
+    event_id = None
     if kind == "task":
         if not db.execute("SELECT 1 FROM work_tasks WHERE task_key = ?", (key,)).fetchone():
             raise ValueError(f"No task {key}.")
@@ -57,11 +59,21 @@ def add(db, kind, key, text):
         if not db.execute("SELECT 1 FROM work_projects WHERE project_key = ? AND status = 'active'", (key,)).fetchone():
             raise ValueError(f"No active project {key}.")
         task_key, project_key = None, key
+    elif kind == "event":
+        # A note on one piece of evidence: it belongs to that event's task, and an event takes one note.
+        event_id = int(key) if str(key).isdigit() else -1
+        row = db.execute("SELECT e.task_key FROM work_events e JOIN work_tasks t ON t.task_key = e.task_key"
+                         " WHERE e.id = ? AND e.kind <> 'note'", (event_id,)).fetchone()
+        if not row:
+            raise ValueError(f"No event {key} on a task.")
+        if db.execute("SELECT 1 FROM work_notes WHERE event_id = ? AND removed_at IS NULL", (event_id,)).fetchone():
+            raise ValueError("That event already has a note. Edit it instead.")
+        task_key, project_key = row[0], None
     else:
-        raise ValueError("A note is on a task or a project.")
+        raise ValueError("A note is on a task, a project or an event.")
     t = now()
-    cur = db.execute("INSERT INTO work_notes (task_key, project_key, text, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                     (task_key, project_key, text, t, t))
+    cur = db.execute("INSERT INTO work_notes (task_key, project_key, text, created_at, updated_at, event_id) VALUES (?, ?, ?, ?, ?, ?)",
+                     (task_key, project_key, text, t, t, event_id))
     log(db, task_key, project_key, "Added: " + quote(text))
     return cur.lastrowid
 
