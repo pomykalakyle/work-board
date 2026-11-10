@@ -6,7 +6,8 @@ Usage (the app runs these; the refresh agent can't, so only the user writes note
   python3 -I notes.py edit ID TEXT
   python3 -I notes.py remove ID
 
-Each change also adds a history event of kind 'note', so History keeps every version.
+Each change to a task or project note also adds a history event of kind 'note', so History keeps every
+version. A note on a history row adds none: it shows under that row, and a second line would repeat it.
 A removed note keeps its row (removed_at set) and drops out of the board and the prompt.
 """
 from pathlib import Path
@@ -74,12 +75,13 @@ def add(db, kind, key, text):
     t = now()
     cur = db.execute("INSERT INTO work_notes (task_key, project_key, text, created_at, updated_at, event_id) VALUES (?, ?, ?, ?, ?, ?)",
                      (task_key, project_key, text, t, t, event_id))
-    log(db, task_key, project_key, "Added: " + quote(text))
+    if event_id is None:
+        log(db, task_key, project_key, "Added: " + quote(text))
     return cur.lastrowid
 
 
 def current(db, note_id):
-    row = db.execute("SELECT task_key, project_key, text FROM work_notes WHERE id = ? AND removed_at IS NULL",
+    row = db.execute("SELECT task_key, project_key, text, event_id FROM work_notes WHERE id = ? AND removed_at IS NULL",
                      (note_id,)).fetchone()
     if not row:
         raise ValueError(f"No note {note_id}.")
@@ -88,18 +90,20 @@ def current(db, note_id):
 
 def edit(db, note_id, text):
     text = clean(text)
-    task_key, project_key, old = current(db, note_id)
+    task_key, project_key, old, event_id = current(db, note_id)
     if text == old:
         return
     db.execute("UPDATE work_notes SET text = ?, updated_at = ? WHERE id = ?", (text, now(), note_id))
-    # No period inside the parentheses: the app ends the line with one.
-    log(db, task_key, project_key, f"Edited: {quote(text)} (was: {quote(old).rstrip('.')})")
+    if event_id is None:
+        # No period inside the parentheses: the app ends the line with one.
+        log(db, task_key, project_key, f"Edited: {quote(text)} (was: {quote(old).rstrip('.')})")
 
 
 def remove(db, note_id):
-    task_key, project_key, old = current(db, note_id)
+    task_key, project_key, old, event_id = current(db, note_id)
     db.execute("UPDATE work_notes SET removed_at = ? WHERE id = ?", (now(), note_id))
-    log(db, task_key, project_key, "Removed: " + quote(old))
+    if event_id is None:
+        log(db, task_key, project_key, "Removed: " + quote(old))
 
 
 def main():

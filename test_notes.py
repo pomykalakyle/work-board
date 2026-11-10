@@ -66,16 +66,20 @@ class NotesTests(unittest.TestCase):
             notes.edit(self.db, n, "y")  # a removed note can't change
 
     def test_note_on_an_event(self):
-        """A note on a history row belongs to that row's task, and a row takes one note at a time."""
+        """A note on a history row belongs to that row's task, a row takes one note at a time, and its
+        changes add no history line of their own (the note shows under its row)."""
         with self.db:
             ev = self.db.execute("INSERT INTO work_events (at, task_key, kind, text) VALUES ('2026-11-10 08:00', 't', 'update', 'CI failed')").lastrowid
             other = self.db.execute("INSERT INTO work_events (at, task_key, kind, text) VALUES ('2026-11-10 08:01', NULL, 'update', 'News')").lastrowid
             n = notes.add(self.db, "event", str(ev), "Runner was flaky.")
+            notes.edit(self.db, n, "Runner was flaky, not the code.")
         self.assertEqual(self.db.execute("SELECT task_key, project_key, event_id FROM work_notes WHERE id = ?", (n,)).fetchone(), ("t", None, ev))
-        self.assertEqual(self.events()[-1], ("t", None, "note", "Added: Runner was flaky."))
+        self.assertEqual([e[2] for e in self.events()], ["update", "update"])
         for key in [str(ev), str(other), "999", "x"]:  # already has a note, no task, missing, not an id
             with self.subTest(key=key), self.assertRaises(ValueError):
                 notes.add(self.db, "event", key, "Again")
+        with self.db:
+            notes.add(self.db, "task", "t", "A task note")
         note_ev = self.db.execute("SELECT id FROM work_events WHERE kind = 'note'").fetchone()[0]
         with self.assertRaises(ValueError):
             notes.add(self.db, "event", str(note_ev), "A note on a note")
@@ -83,6 +87,7 @@ class NotesTests(unittest.TestCase):
         with self.db:
             notes.remove(self.db, n)
             notes.add(self.db, "event", str(ev), "Fixed now.")
+        self.assertEqual([e[3] for e in self.events() if e[2] == "note"], ["Added: A task note"])
 
     def test_long_note_is_quoted_short(self):
         with self.db:
